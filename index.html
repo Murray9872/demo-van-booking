@@ -539,7 +539,10 @@ function showLogin(){
   document.getElementById('app').style.display='none';
 }
 
+var authBusy=false;
 async function startApp(session){
+  if(authBusy||appReady)return;
+  authBusy=true;
   try{
     currentUser=session.user;
     await loadProfile();
@@ -548,6 +551,7 @@ async function startApp(session){
     console.error('startApp failed:',e);
     showLogin();
   }
+  authBusy=false;
 }
 
 // Auth handler — only show login on explicit SIGNED_OUT (auth screen is visible by default)

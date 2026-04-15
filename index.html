@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Demo Van Booking — Apera AI</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+:root{
+  --blue:#0072C6;--blue-dark:#005799;--blue-light:#E6F2FB;
+  --green-bg:#D1FAE5;--green-text:#065F46;
+  --amber-bg:#FEF3C7;--amber-text:#92400E;
+  --red-bg:#FEE2E2;--red-text:#991B1B;
+  --border:#C1C7D0;--text:#111827;--muted:#4B5563;
+  --page:#EDF1F5;--card:#fff;--radius:10px;--rsm:7px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;background:var(--page);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased;}
+
+/* AUTH */
+.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
+.auth-card{background:var(--card);border:2px solid var(--border);border-radius:var(--radius);padding:40px;width:100%;max-width:420px;}
+.auth-logo{display:flex;align-items:center;gap:10px;margin-bottom:28px;}
+.auth-logo span{font-size:17px;font-weight:700;color:var(--blue);}
+.auth-title{font-size:20px;font-weight:700;margin-bottom:6px;}
+.auth-sub{font-size:13px;color:var(--muted);margin-bottom:24px;}
+.auth-tabs{display:flex;gap:0;border:2px solid var(--border);border-radius:var(--rsm);overflow:hidden;margin-bottom:24px;}
+.auth-tab{flex:1;padding:9px;font-size:13px;font-weight:600;border:none;background:transparent;cursor:pointer;color:var(--muted);font-family:'DM Sans',sans-serif;}
+.auth-tab.active{background:var(--blue);color:#fff;}
+
+/* HEADER */
+.header{background:var(--blue);height:56px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 6px rgba(0,0,0,0.2);position:sticky;top:0;z-index:100;}
+.header-left{display:flex;align-items:center;gap:10px;}
+.header-title{color:#fff;font-size:15px;font-weight:700;}
+.header-right{display:flex;align-items:center;gap:12px;}
+.user-pill{background:rgba(255,255,255,0.18);color:#fff;font-size:12px;padding:4px 12px;border-radius:20px;border:1px solid rgba(255,255,255,0.3);}
+.admin-pill{background:#FCD34D;color:#92400E;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;font-family:'DM Mono',monospace;}
+.logout-btn{background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.25);padding:5px 14px;border-radius:20px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;}
+
+/* NAV */
+.nav{background:#fff;border-bottom:2px solid var(--border);display:flex;padding:0 16px;}
+.nav-btn{padding:13px 16px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:#6B7280;border-bottom:3px solid transparent;margin-bottom:-2px;font-family:'DM Sans',sans-serif;}
+
+/* LAYOUT */
+.container{max-width:900px;margin:0 auto;padding:24px 16px 60px;}
+
+/* CARDS */
+.card{background:var(--card);border:2px solid var(--border);border-radius:var(--radius);padding:24px;}
+.card+.card{margin-top:16px;}
+.sec-title{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:var(--blue);margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid #E5E7EB;}
+
+/* VAN STATUS */
+.van-card{background:var(--card);border:2px solid var(--border);border-radius:var(--radius);padding:14px 18px;margin-bottom:18px;display:flex;align-items:center;gap:12px;}
+.van-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;background:#059669;box-shadow:0 0 0 4px #D1FAE5;}
+.van-dot.busy{background:#D97706;box-shadow:0 0 0 4px #FEF3C7;}
+.van-info{flex:1;}
+.van-location{font-size:14px;font-weight:700;}
+.van-sub{font-size:12px;color:var(--muted);margin-top:2px;}
+
+/* BADGES */
+.badge{font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;font-family:'DM Mono',monospace;border:1.5px solid;white-space:nowrap;}
+.badge-ok{background:var(--green-bg);color:var(--green-text);border-color:#6EE7B7;}
+.badge-busy{background:var(--amber-bg);color:var(--amber-text);border-color:#FCD34D;}
+.badge-conf{background:var(--green-bg);color:var(--green-text);border-color:#6EE7B7;}
+.badge-pend{background:var(--amber-bg);color:var(--amber-text);border-color:#FCD34D;}
+.badge-req{background:#F3F4F6;color:#374151;border-color:#D1D5DB;}
+.badge-canc{background:var(--red-bg);color:var(--red-text);border-color:#FCA5A5;}
+
+/* FORMS */
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+@media(max-width:520px){.form-row{grid-template-columns:1fr;}}
+.fg{margin-bottom:16px;}
+.fg label{display:block;font-size:12px;font-weight:800;color:#1F2937;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.06em;}
+.fg label .req{color:#DC2626;margin-left:2px;}
+.fg input,.fg select,.fg textarea{width:100%;padding:10px 13px;border:2px solid var(--border);border-radius:var(--rsm);font-size:14px;font-family:'DM Sans',sans-serif;font-weight:500;color:var(--text);background:#FAFBFC;outline:none;-webkit-appearance:none;appearance:none;}
+.fg input::placeholder,.fg textarea::placeholder{color:#9CA3AF;font-weight:400;}
+.fg select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:38px;}
+.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--blue);background:#fff;}
+.fg textarea{min-height:80px;resize:vertical;line-height:1.5;}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;}
+.chip{display:inline-block;padding:6px 13px;border:2px solid var(--border);border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;color:#4B5563;background:#F9FAFB;user-select:none;}
+.chip.on{background:var(--blue-light);color:#005799;border-color:#4FA8D5;font-weight:700;}
+.divider{height:2px;background:#E5E7EB;margin:20px 0;}
+
+/* ALERTS */
+.alert{padding:11px 15px;border-radius:var(--rsm);font-size:13px;font-weight:600;margin-bottom:16px;border:2px solid;line-height:1.5;}
+.alert-err{background:#FEF2F2;color:#991B1B;border-color:#FECACA;}
+.alert-ok{background:#ECFDF5;color:#065F46;border-color:#A7F3D0;}
+
+/* BUTTONS */
+.btn{padding:11px 20px;border-radius:var(--rsm);font-size:14px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;border:none;transition:background 0.15s;}
+.btn-primary{background:var(--blue);color:#fff;width:100%;padding:12px;}
+.btn-primary:hover{background:var(--blue-dark);}
+.btn-sm{padding:6px 14px;font-size:12px;}
+.btn-approve{background:var(--green-bg);color:var(--green-text);border:1.5px solid #6EE7B7;}
+.btn-approve:hover{background:#A7F3D0;}
+.btn-reject{background:var(--red-bg);color:var(--red-text);border:1.5px solid #FCA5A5;}
+.btn-reject:hover{background:#FEE2E2;}
+.btn-cancel{background:#F3F4F6;color:#374151;border:1.5px solid #D1D5DB;}
+
+/* BOOKING LIST */
+.brow{display:flex;align-items:flex-start;gap:14px;padding:14px 0;border-bottom:1.5px solid #E5E7EB;}
+.brow:last-child{border-bottom:none;}
+.brow-main{flex:1;min-width:0;}
+.brow-acct{font-size:14px;font-weight:700;}
+.brow-meta{font-size:12px;color:var(--muted);margin-top:2px;}
+.brow-types{font-size:11px;color:var(--muted);margin-top:3px;font-style:italic;}
+.brow-actions{display:flex;gap:6px;flex-shrink:0;}
+
+/* CALENDAR */
+.cal-wrap{margin-bottom:20px;}
+.cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.cal-title{font-size:15px;font-weight:700;}
+.cal-nav{background:none;border:2px solid var(--border);border-radius:var(--rsm);padding:5px 12px;cursor:pointer;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;color:var(--text);}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
+.cal-day-header{text-align:center;font-size:11px;font-weight:700;color:var(--muted);padding:6px 0;text-transform:uppercase;letter-spacing:0.05em;}
+.cal-day{min-height:38px;border-radius:var(--rsm);border:1.5px solid transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:default;position:relative;}
+.cal-day-num{font-size:12px;font-weight:600;}
+.cal-day.other-month .cal-day-num{color:#D1D5DB;}
+.cal-day.today{border-color:var(--blue);}
+.cal-day.today .cal-day-num{color:var(--blue);font-weight:800;}
+.cal-day.booked{background:#FEE2E2;border-color:#FCA5A5;}
+.cal-day.booked .cal-day-num{color:#991B1B;}
+.cal-day.confirmed{background:#D1FAE5;border-color:#6EE7B7;}
+.cal-day.confirmed .cal-day-num{color:#065F46;}
+.cal-day.pending{background:#FEF3C7;border-color:#FCD34D;}
+.cal-day.pending .cal-day-num{color:#92400E;}
+.cal-legend{display:flex;gap:16px;margin-top:10px;flex-wrap:wrap;}
+.cal-legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);font-weight:600;}
+.cal-legend-dot{width:10px;height:10px;border-radius:3px;}
+
+/* EMPTY */
+.empty{text-align:center;padding:40px 24px;color:var(--muted);font-size:14px;}
+.co-item{padding:10px 14px;cursor:pointer;border-bottom:1px solid #F3F4F6;font-size:13px;}
+.co-item:last-child{border-bottom:none;}
+.co-item:hover{background:#EFF6FF;}
+.co-name{font-weight:700;color:#111827;}
+.co-loc{font-size:11px;color:#6B7280;margin-top:1px;}
+
+/* ADMIN NOTES */
+.notes-input{width:100%;padding:8px 12px;border:2px solid var(--border);border-radius:var(--rsm);font-size:13px;font-family:'DM Sans',sans-serif;resize:none;outline:none;margin-top:6px;}
+.notes-input:focus{border-color:var(--blue);}
+</style>
+</head>
+<body>
+
+<!-- LOADING SCREEN -->
+<div id="loading-screen" style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--page);">
+  <div style="text-align:center;">
+    <svg width="40" height="40" viewBox="0 0 32 32" fill="none" style="margin-bottom:12px;"><rect width="32" height="32" rx="8" fill="#0072C6"/><path d="M8 23L16 9L24 23H19L16 17L13 23H8Z" fill="white"/></svg>
+    <div style="font-size:13px;color:#6B7280;font-family:'DM Sans',sans-serif;">Loading...</div>
+  </div>
+</div>
+
+<!-- AUTH SCREEN -->
+<div id="auth-screen" class="auth-wrap">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="8" fill="#0072C6"/><path d="M8 23L16 9L24 23H19L16 17L13 23H8Z" fill="white"/></svg>
+      <span>Apera AI — Demo Van</span>
+    </div>
+    <h1 class="auth-title">Welcome back</h1>
+    <p class="auth-sub">Sign in to book the demo van or create an account.</p>
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchAuth('login')">Sign in</button>
+      <button class="auth-tab" onclick="switchAuth('signup')">Create account</button>
+    </div>
+    <div id="auth-alert" style="display:none;"></div>
+    <div id="login-form">
+      <div class="fg"><label>Email</label><input type="email" id="login-email" placeholder="you@apera.ai"></div>
+      <div class="fg"><label>Password</label><input type="password" id="login-pass" placeholder="••••••••"></div>
+      <button class="btn btn-primary" onclick="login()">Sign in</button>
+    </div>
+    <div id="signup-form" style="display:none;">
+      <div class="fg"><label>Full name</label><input type="text" id="signup-name" placeholder="Sarah Mitchell"></div>
+      <div class="fg"><label>Email</label><input type="email" id="signup-email" placeholder="you@apera.ai"></div>
+      <div class="fg"><label>Password</label><input type="password" id="signup-pass" placeholder="Min 6 characters"></div>
+      <button class="btn btn-primary" onclick="signup()">Create account</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app" style="display:none;">
+  <div class="header">
+    <div class="header-left">
+      <svg width="28" height="28" viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="8" fill="rgba(255,255,255,0.2)"/><path d="M8 23L16 9L24 23H19L16 17L13 23H8Z" fill="white"/></svg>
+      <span class="header-title">Demo Van Booking</span>
+    </div>
+    <div class="header-right">
+      <span class="user-pill" id="user-pill">Loading...</span>
+      <span class="admin-pill" id="admin-pill" style="display:none;">ADMIN</span>
+      <button class="logout-btn" onclick="logout()">Sign out</button>
+    </div>
+  </div>
+
+  <div class="nav">
+    <button class="nav-btn" id="nb-book" onclick="showTab('book')">Book the van</button>
+    <button class="nav-btn" id="nb-calendar" onclick="showTab('calendar')">Calendar</button>
+    <button class="nav-btn" id="nb-mine" onclick="showTab('mine')">My bookings</button>
+    <button class="nav-btn" id="nb-admin" onclick="showTab('admin')" style="display:none;">Admin</button>
+  </div>
+
+  <!-- BOOK TAB -->
+  <div id="tab-book" style="display:none;">
+    <div class="container">
+      <div class="van-card">
+        <div class="van-dot" id="vdot"></div>
+        <div class="van-info">
+          <div class="van-location" id="vloc">Loading van status...</div>
+          <div class="van-sub" id="vsub"></div>
+        </div>
+        <span class="badge badge-ok" id="vbadge">Available</span>
+      </div>
+      <div class="card">
+        <div id="book-alert" style="display:none;"></div>
+        <p class="sec-title">Your details</p>
+        <div class="form-row">
+          <div class="fg"><label>Name <span class="req">*</span></label><input type="text" id="f-rep" placeholder="Your full name"></div>
+          <div class="fg"><label>Email <span class="req">*</span></label><input type="email" id="f-email" placeholder="you@apera.ai"></div>
+        </div>
+        <div class="divider"></div>
+        <p class="sec-title">Booking details</p>
+        <div class="fg" style="position:relative;">
+          <label>Customer / Account <span class="req">*</span></label>
+          <input type="text" id="f-acct" placeholder="Enter company name..." autocomplete="off">
+          <input type="hidden" id="f-hubspot-id">
+          <input type="hidden" id="f-hubspot-name">
+        </div>
+        <div class="form-row">
+          <div class="fg"><label>Demo Location <span class="req">*</span></label><input type="text" id="f-loc" placeholder="City, State"></div>
+          <div class="fg"><label>Start Date <span class="req">*</span></label><input type="date" id="f-date"></div>
+        </div>
+        <div class="fg">
+          <label>Duration <span class="req">*</span></label>
+          <select id="f-dur">
+            <option value="">Select...</option>
+            <option value="0.5">Half day</option>
+            <option value="1">1 day</option>
+            <option value="2">2 days</option>
+            <option value="3">3 days</option>
+            <option value="4">4 days</option>
+            <option value="5">5 days</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>Demo Type(s) <span class="req">*</span></label>
+          <div class="chips">
+            <span class="chip" onclick="this.classList.toggle('on')">Bin picking</span>
+            <span class="chip" onclick="this.classList.toggle('on')">Dunnage picking</span>
+            <span class="chip" onclick="this.classList.toggle('on')">De-racking</span>
+            <span class="chip" onclick="this.classList.toggle('on')">Machine tending</span>
+            <span class="chip" onclick="this.classList.toggle('on')">Assembly</span>
+            <span class="chip" onclick="this.classList.toggle('on')">Sorting</span>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <p class="sec-title">Customer contact</p>
+        <div class="form-row">
+          <div class="fg"><label>Contact Name</label><input type="text" id="f-contact-name" placeholder="Jane Smith"></div>
+          <div class="fg"><label>Contact Email</label><input type="email" id="f-contact-email" placeholder="jane@customer.com"></div>
+        </div>
+        <div class="fg"><label>Contact Phone</label><input type="tel" id="f-contact-phone" placeholder="(555) 555-5555"></div>
+        <div class="fg">
+          <label>Notes</label>
+          <textarea id="f-notes" placeholder="Plant access requirements, site contact, part types..."></textarea>
+        </div>
+        <button class="btn btn-primary" onclick="submitBooking()">Request Booking</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CALENDAR TAB -->
+  <div id="tab-calendar" style="display:none;">
+    <div class="container">
+      <div class="card">
+        <div class="cal-wrap">
+          <div class="cal-header">
+            <button class="cal-nav" onclick="calPrev()">&#8592;</button>
+            <span class="cal-title" id="cal-title"></span>
+            <button class="cal-nav" onclick="calNext()">&#8594;</button>
+          </div>
+          <div class="cal-grid" id="cal-grid"></div>
+          <div class="cal-legend">
+            <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#D1FAE5;border:1.5px solid #6EE7B7;"></div>Confirmed</div>
+            <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#FEF3C7;border:1.5px solid #FCD34D;"></div>Pending</div>
+            <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#FEE2E2;border:1.5px solid #FCA5A5;"></div>Requested</div>
+          </div>
+        </div>
+      </div>
+      <div class="card" id="cal-bookings-card">
+        <p class="sec-title">This month's bookings</p>
+        <div id="cal-booking-list"><div class="empty">No bookings this month.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MY BOOKINGS TAB -->
+  <div id="tab-mine" style="display:none;">
+    <div class="container">
+      <div class="card">
+        <p class="sec-title">My bookings</p>
+        <div id="mine-list"><div class="empty">No bookings yet.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADMIN TAB -->
+  <div id="tab-admin" style="display:none;">
+    <div class="container">
+      <div class="card">
+        <p class="sec-title">Pending approval</p>
+        <div id="admin-pending"><div class="empty">No pending bookings.</div></div>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <p class="sec-title">All bookings</p>
+        <div id="admin-all"><div class="empty">No bookings yet.</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// -- SUPABASE CONFIG --
+const SUPABASE_URL  = 'https://gtcinsveqrwqakxentfo.supabase.co';
+const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd0Y2luc3ZlcXJ3cWFreGVudGZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwOTQzMzksImV4cCI6MjA5MTY3MDMzOX0.BsCaAnqO0x7PsKoAnv776hQWAYx4Qihpp2znesLjBfU';
+const ADMIN_EMAIL   = 'austin.murray@apera-ai.com';
+// ---------------------
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let currentUser = null;
+let currentProfile = null;
+let calYear = new Date().getFullYear();
+let calMonth = new Date().getMonth();
+let allBookings = [];
+
+// ── AUTH ──────────────────────────────────────────────
+function switchAuth(mode) {
+  document.getElementById('login-form').style.display = mode === 'login' ? 'block' : 'none';
+  document.getElementById('signup-form').style.display = mode === 'signup' ? 'block' : 'none';
+  document.querySelectorAll('.auth-tab').forEach((t,i) => t.classList.toggle('active', (i===0&&mode==='login')||(i===1&&mode==='signup')));
+  document.getElementById('auth-alert').style.display = 'none';
+}
+
+function showAuthAlert(msg, ok) {
+  var el = document.getElementById('auth-alert');
+  el.className = 'alert ' + (ok ? 'alert-ok' : 'alert-err');
+  el.textContent = msg;
+  el.style.display = 'block';
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function login() {
+  var email = document.getElementById('login-email').value.trim();
+  var pass  = document.getElementById('login-pass').value;
+  if (!email || !pass) { showAuthAlert('Please enter email and password.'); return; }
+  showAuthAlert('Signing in...', true);
+  var { error } = await sb.auth.signInWithPassword({ email, password: pass });
+  if (error) {
+    var msg = error.message;
+    if (msg.includes('Invalid login') || msg.includes('invalid_credentials')) msg = 'Incorrect email or password. Have you created an account yet?';
+    showAuthAlert(msg);
+  }
+}
+
+async function signup() {
+  var name  = document.getElementById('signup-name').value.trim();
+  var email = document.getElementById('signup-email').value.trim();
+  var pass  = document.getElementById('signup-pass').value;
+  if (!name || !email || !pass) { showAuthAlert('Please fill in all fields.'); return; }
+  if (pass.length < 6) { showAuthAlert('Password must be at least 6 characters.'); return; }
+  var role = email === ADMIN_EMAIL ? 'admin' : 'user';
+  var { error } = await sb.auth.signUp({
+    email, password: pass,
+    options: { data: { full_name: name, role } }
+  });
+  if (error) showAuthAlert(error.message);
+  else showAuthAlert('Account created! Check your email to confirm, then sign in.', true);
+}
+
+async function logout() {
+  await sb.auth.signOut();
+  // Clear any stale session data from storage and do a hard reload
+  // so the next sign-in always starts from a clean slate
+  localStorage.clear();
+  sessionStorage.clear();
+  window.location.reload();
+}
+
+// ── SESSION ───────────────────────────────────────────
+// On refresh, Supabase restores the session async — hide both screens
+// until we know the auth state, then show the right one.
+document.getElementById('auth-screen').style.display = 'none';
+document.getElementById('app').style.display = 'none';
+
+sb.auth.onAuthStateChange(async (event, session) => {
+  document.getElementById('loading-screen').style.display = 'none';
+  if (session) {
+    currentUser = session.user;
+    await loadProfile();
+    initApp();
+  } else {
+    currentUser = null; currentProfile = null;
+    document.getElementById('auth-screen').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+  }
+});
+
+async function loadProfile() {
+  var { data } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
+  if (data) {
+    currentProfile = data;
+  } else {
+    // Profile might not exist yet if email not confirmed — use email to determine role
+    currentProfile = { email: currentUser.email, full_name: currentUser.user_metadata?.full_name || currentUser.email, role: currentUser.email === ADMIN_EMAIL ? 'admin' : 'user' };
+  }
+  // Ensure admin email always gets admin role
+  if (currentProfile.email === ADMIN_EMAIL) currentProfile.role = 'admin';
+}
+
+function initApp() {
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('user-pill').textContent = currentProfile.full_name || currentProfile.email;
+  var isAdmin = currentProfile.role === 'admin';
+  document.getElementById('admin-pill').style.display = isAdmin ? 'inline' : 'none';
+  document.getElementById('nb-admin').style.display = isAdmin ? 'block' : 'none';
+  // Pre-fill form
+  document.getElementById('f-rep').value = currentProfile.full_name || '';
+  document.getElementById('f-email').value = currentProfile.email || '';
+  // Min date
+  var md = new Date(); md.setDate(md.getDate()+7);
+  document.getElementById('f-date').min = md.toISOString().split('T')[0];
+  showTab('book');
+  loadBookings();
+  setupRealtime();
+}
+
+// ── TAB SWITCHING ─────────────────────────────────────
+function showTab(id) {
+  ['book','calendar','mine','admin'].forEach(t => {
+    var el = document.getElementById('tab-' + t);
+    var btn = document.getElementById('nb-' + t);
+    if (el) el.style.display = (t===id) ? 'block' : 'none';
+    if (btn) {
+      btn.style.color = (t===id) ? '#0072C6' : '#6B7280';
+      btn.style.borderBottom = (t===id) ? '3px solid #0072C6' : '3px solid transparent';
+    }
+  });
+  if (id === 'calendar') renderCalendar();
+  if (id === 'mine') renderMine();
+  if (id === 'admin') renderAdmin();
+}
+
+// ── LOAD BOOKINGS + REALTIME ─────────────────────────
+async function loadBookings() {
+  var { data } = await sb.from('bookings').select('*').order('demo_start_date', { ascending: true });
+  allBookings = data || [];
+  updateVanStatus();
+  if (document.getElementById('tab-calendar').style.display !== 'none') renderCalendar();
+  if (document.getElementById('tab-mine').style.display !== 'none') renderMine();
+  if (document.getElementById('tab-admin').style.display !== 'none') renderAdmin();
+}
+
+function setupRealtime() {
+  sb.channel('bookings-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, function(payload) {
+      // A booking was inserted, updated or deleted — reload everything
+      loadBookings();
+    })
+    .subscribe();
+}
+
+// ── VAN STATUS ────────────────────────────────────────
+function updateVanStatus() {
+  var today = new Date().toISOString().split('T')[0];
+  var active = allBookings.find(b => {
+    var end = addDays(b.demo_start_date, (b.duration_days||1)-1);
+    return b.demo_start_date <= today && end >= today && b.status !== 'Cancelled';
+  });
+  var next = allBookings.filter(b => b.demo_start_date > today && b.status !== 'Cancelled')
+    .sort((a,b) => a.demo_start_date.localeCompare(b.demo_start_date))[0];
+  if (active) {
+    document.getElementById('vloc').textContent = active.location;
+    document.getElementById('vsub').textContent = 'In use: ' + active.account;
+    document.getElementById('vbadge').textContent = 'In use';
+    document.getElementById('vbadge').className = 'badge badge-busy';
+    document.getElementById('vdot').className = 'van-dot busy';
+  } else if (next) {
+    document.getElementById('vloc').textContent = next.location || 'Detroit, MI';
+    document.getElementById('vsub').textContent = 'Next: ' + next.account + ' · ' + fmtDate(next.demo_start_date);
+    document.getElementById('vbadge').textContent = 'Available';
+    document.getElementById('vbadge').className = 'badge badge-ok';
+    document.getElementById('vdot').className = 'van-dot';
+  } else {
+    document.getElementById('vloc').textContent = 'Detroit, MI';
+    document.getElementById('vsub').textContent = 'No upcoming bookings';
+    document.getElementById('vbadge').textContent = 'Available';
+    document.getElementById('vbadge').className = 'badge badge-ok';
+    document.getElementById('vdot').className = 'van-dot';
+  }
+}
+
+// ── HUBSPOT COMPANY SEARCH (disabled - pending API token) ────
+// Will be re-enabled once a HubSpot private app token is available.
+
+// ── SUBMIT BOOKING ────────────────────────────────────
+async function submitBooking() {
+  var rep   = document.getElementById('f-rep').value.trim();
+  var email = document.getElementById('f-email').value.trim();
+  var acct  = document.getElementById('f-acct').value.trim();
+  var loc   = document.getElementById('f-loc').value.trim();
+  var date  = document.getElementById('f-date').value;
+  var dur   = document.getElementById('f-dur').value;
+  var chips = Array.from(document.querySelectorAll('.chip.on')).map(c => c.textContent);
+  var notes = document.getElementById('f-notes').value.trim();
+  var alertEl = document.getElementById('book-alert');
+  alertEl.style.display = 'none';
+
+  if (!rep||!email||!acct||!loc||!date||!dur) {
+    alertEl.className='alert alert-err'; alertEl.textContent='Please fill in all required fields.'; alertEl.style.display='block'; return;
+  }
+  if (!chips.length) {
+    alertEl.className='alert alert-err'; alertEl.textContent='Please select at least one demo type.'; alertEl.style.display='block'; return;
+  }
+  var minD = new Date(); minD.setDate(minD.getDate()+7);
+  if (new Date(date+'T00:00:00') < minD) {
+    alertEl.className='alert alert-err'; alertEl.textContent='Bookings require at least 1 week advance notice.'; alertEl.style.display='block'; return;
+  }
+
+  var hsId = document.getElementById('f-hubspot-id').value;
+  var hsName = document.getElementById('f-hubspot-name').value;
+  var contactName  = document.getElementById('f-contact-name').value.trim();
+  var contactEmail = document.getElementById('f-contact-email').value.trim();
+  var contactPhone = document.getElementById('f-contact-phone').value.trim();
+  var { error } = await sb.from('bookings').insert({
+    rep_id: currentUser?.id || null,
+    rep_name: rep, rep_email: email,
+    account: acct, location: loc,
+    demo_start_date: date,
+    duration_days: parseFloat(dur),
+    demo_types: chips,
+    notes: notes,
+    status: 'Requested',
+    hubspot_company_id: hsId || null,
+    hubspot_company_name: hsName || acct,
+    contact_name: contactName || null,
+    contact_email: contactEmail || null,
+    contact_phone: contactPhone || null
+  });
+
+  if (error) {
+    alertEl.className='alert alert-err'; alertEl.textContent='Error: '+error.message; alertEl.style.display='block';
+  } else {
+    alertEl.className='alert alert-ok'; alertEl.textContent='Booking requested! You will receive a confirmation once the coordinator approves.'; alertEl.style.display='block';
+    document.getElementById('f-acct').value='';
+    document.getElementById('f-loc').value='';
+    document.getElementById('f-date').value='';
+    document.getElementById('f-dur').value='';
+    document.getElementById('f-notes').value='';
+    document.getElementById('f-contact-name').value='';
+    document.getElementById('f-contact-email').value='';
+    document.getElementById('f-contact-phone').value='';
+    document.querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
+    await loadBookings();
+  }
+}
+
+// ── CALENDAR ──────────────────────────────────────────
+function calPrev() { calMonth--; if(calMonth<0){calMonth=11;calYear--;} renderCalendar(); }
+function calNext() { calMonth++; if(calMonth>11){calMonth=0;calYear++;} renderCalendar(); }
+
+function renderCalendar() {
+  var months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('cal-title').textContent = months[calMonth] + ' ' + calYear;
+
+  // Build booked date map
+  var bookedMap = {};
+  allBookings.filter(b => b.status !== 'Cancelled').forEach(b => {
+    var dur = parseFloat(b.duration_days||1);
+    for (var i=0; i<dur; i++) {
+      var d = addDays(b.demo_start_date, i);
+      if (!bookedMap[d] || b.status === 'Confirmed') bookedMap[d] = b.status;
+    }
+  });
+
+  var grid = document.getElementById('cal-grid');
+  var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var html = days.map(d => '<div class="cal-day-header">'+d+'</div>').join('');
+
+  var first = new Date(calYear, calMonth, 1);
+  var last  = new Date(calYear, calMonth+1, 0);
+  var today = new Date().toISOString().split('T')[0];
+
+  // Pad start
+  for (var i=0; i<first.getDay(); i++) {
+    var pd = new Date(calYear, calMonth, -first.getDay()+i+1);
+    html += '<div class="cal-day other-month"><span class="cal-day-num">'+pd.getDate()+'</span></div>';
+  }
+  for (var d=1; d<=last.getDate(); d++) {
+    var ds = calYear+'-'+String(calMonth+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    var cls = 'cal-day';
+    if (ds === today) cls += ' today';
+    var st = bookedMap[ds];
+    if (st === 'Confirmed') cls += ' confirmed';
+    else if (st === 'Pending') cls += ' pending';
+    else if (st === 'Requested') cls += ' booked';
+    html += '<div class="'+cls+'"><span class="cal-day-num">'+d+'</span></div>';
+  }
+  // Pad end
+  var rem = (7 - (first.getDay() + last.getDate()) % 7) % 7;
+  for (var i=1; i<=rem; i++) html += '<div class="cal-day other-month"><span class="cal-day-num">'+i+'</span></div>';
+  grid.innerHTML = html;
+
+  // List bookings this month
+  var monthBookings = allBookings.filter(b => {
+    var bm = new Date(b.demo_start_date+'T00:00:00').getMonth();
+    var by = new Date(b.demo_start_date+'T00:00:00').getFullYear();
+    return bm === calMonth && by === calYear && b.status !== 'Cancelled';
+  });
+  var listEl = document.getElementById('cal-booking-list');
+  if (!monthBookings.length) { listEl.innerHTML='<div class="empty">No bookings this month.</div>'; return; }
+  listEl.innerHTML = monthBookings.map(b => {
+    var bc = badgeClass(b.status);
+    return '<div class="brow"><div class="brow-main"><div class="brow-acct">'+b.account+'</div><div class="brow-meta">'+b.location+' · '+fmtDate(b.demo_start_date)+(b.duration_days>1?' · '+(b.duration_days)+' days':'')+' · '+b.rep_name+'</div><div class="brow-types">'+(b.demo_types||[]).join(', ')+'</div></div><span class="badge '+bc+'">'+b.status+'</span></div>';
+  }).join('');
+}
+
+// ── MY BOOKINGS ───────────────────────────────────────
+function renderMine() {
+  var mine = allBookings.filter(b => b.rep_email === currentProfile.email)
+    .sort((a,b) => b.created_at.localeCompare(a.created_at));
+  var el = document.getElementById('mine-list');
+  if (!mine.length) { el.innerHTML='<div class="empty">No bookings yet. Submit a request on the Book tab!</div>'; return; }
+  el.innerHTML = mine.map(b => {
+    var bc = badgeClass(b.status);
+    var dur = b.duration_days < 1 ? 'Half day' : b.duration_days + ' day' + (b.duration_days > 1 ? 's' : '');
+    return '<div class="brow"><div class="brow-main"><div class="brow-acct">'+b.account+'</div><div class="brow-meta">'+b.location+' · '+fmtDate(b.demo_start_date)+' · '+dur+'</div><div class="brow-types">'+(b.demo_types||[]).join(', ')+(b.contact_name?'<br>Contact: '+b.contact_name+(b.contact_email?' · '+b.contact_email:'')+(b.contact_phone?' · '+b.contact_phone:''):'')+(b.coordinator_notes?'<br><em>Note: '+b.coordinator_notes+'</em>':'')+'</div></div><span class="badge '+bc+'">'+b.status+'</span></div>';
+  }).join('');
+}
+
+// ── ADMIN ─────────────────────────────────────────────
+function renderAdmin() {
+  if (currentProfile.role !== 'admin') return;
+  var pending = allBookings.filter(b => b.status === 'Requested');
+  var pendingEl = document.getElementById('admin-pending');
+  if (!pending.length) pendingEl.innerHTML = '<div class="empty">No pending bookings.</div>';
+  else pendingEl.innerHTML = pending.map(b => adminRow(b, true)).join('');
+
+  var allEl = document.getElementById('admin-all');
+  if (!allBookings.length) allEl.innerHTML = '<div class="empty">No bookings yet.</div>';
+  else allEl.innerHTML = allBookings.map(b => adminRow(b, false)).join('');
+}
+
+function adminRow(b, showActions) {
+  var bc = badgeClass(b.status);
+  var dur = b.duration_days < 1 ? 'Half day' : b.duration_days + ' day' + (b.duration_days > 1 ? 's' : '');
+  var actions = showActions ? `
+    <div style="margin-top:8px;">
+      <textarea class="notes-input" id="notes-${b.id}" rows="2" placeholder="Add coordinator note (optional)...">${b.coordinator_notes||''}</textarea>
+      <div class="brow-actions" style="margin-top:6px;">
+        <button class="btn btn-sm btn-approve" onclick="updateBooking('${b.id}','Confirmed')">Confirm</button>
+        <button class="btn btn-sm btn-reject" onclick="updateBooking('${b.id}','Pending')">Hold</button>
+        <button class="btn btn-sm btn-cancel" onclick="updateBooking('${b.id}','Cancelled')">Cancel</button>
+      </div>
+    </div>` : `
+    <div class="brow-actions" style="margin-top:6px;">
+      ${b.status !== 'Confirmed' ? '<button class="btn btn-sm btn-approve" onclick="updateBooking(\''+b.id+'\',\'Confirmed\')">Confirm</button>' : ''}
+      ${b.status !== 'Cancelled' ? '<button class="btn btn-sm btn-cancel" onclick="updateBooking(\''+b.id+'\',\'Cancelled\')">Cancel</button>' : ''}
+    </div>`;
+  return `<div class="brow" style="flex-direction:column;align-items:stretch;">
+    <div style="display:flex;align-items:flex-start;gap:12px;">
+      <div class="brow-main">
+        <div class="brow-acct">${b.account}</div>
+        <div class="brow-meta">${b.location} · ${fmtDate(b.demo_start_date)} · ${dur} · ${b.rep_name} (${b.rep_email})</div>
+        <div class="brow-types">${(b.demo_types||[]).join(', ')}${b.notes?'<br>Notes: '+b.notes:''}${b.contact_name?'<br>Contact: '+b.contact_name+(b.contact_email?' · '+b.contact_email:'')+(b.contact_phone?' · '+b.contact_phone:''):''}</div>
+      </div>
+      <span class="badge ${bc}">${b.status}</span>
+    </div>
+    ${actions}
+  </div>`;
+}
+
+async function updateBooking(id, status) {
+  var notes = document.getElementById('notes-'+id);
+  var update = { status };
+  if (notes) update.coordinator_notes = notes.value.trim();
+  await sb.from('bookings').update(update).eq('id', id);
+  await loadBookings();
+  renderAdmin();
+}
+
+// ── HELPERS ───────────────────────────────────────────
+function fmtDate(s) {
+  if (!s) return '';
+  var d = new Date(s+'T00:00:00');
+  return d.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+}
+
+function addDays(s, n) {
+  var d = new Date(s+'T00:00:00');
+  d.setDate(d.getDate()+Math.floor(parseFloat(n)));
+  return d.toISOString().split('T')[0];
+}
+
+function badgeClass(status) {
+  var map = { Confirmed:'badge-conf', Pending:'badge-pend', Requested:'badge-req', Cancelled:'badge-canc' };
+  return map[status] || 'badge-req';
+}
+</script>
+</body>
+</html>

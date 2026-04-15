@@ -477,7 +477,7 @@ var SURL='https://gtcinsveqrwqakxentfo.supabase.co';
 var SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd0Y2luc3ZlcXJ3cWFreGVudGZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwOTQzMzksImV4cCI6MjA5MTY3MDMzOX0.BsCaAnqO0x7PsKoAnv776hQWAYx4Qihpp2znesLjBfU';
 var ADMIN_EMAIL='austin.murray@apera-ai.com';
 var sb;
-try{sb=supabase.createClient(SURL,SKEY);}catch(e){console.error('Supabase init failed:',e);document.body.innerHTML='<div style="padding:40px;text-align:center;font-family:sans-serif;"><h2>Failed to load</h2><p>Please refresh the page.</p></div>';}
+try{sb=supabase.createClient(SURL,SKEY,{auth:{persistSession:true,lock:async function(name,acquireTimeout,fn){return await fn();}}});}catch(e){console.error('Supabase init failed:',e);document.body.innerHTML='<div style="padding:40px;text-align:center;font-family:sans-serif;"><h2>Failed to load</h2><p>Please refresh the page.</p></div>';}
 
 var currentUser=null,currentProfile=null,allBookings=[];
 var calY=new Date().getFullYear(),calM=new Date().getMonth();

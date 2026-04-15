@@ -493,9 +493,9 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--text);min
           <ol style="margin:8px 0 0 20px;">
             <li>Go to <strong>resend.com</strong> and create a free account</li>
             <li>Copy your API key from the dashboard</li>
-            <li>In <strong>Netlify</strong> → Site settings → Environment variables</li>
+            <li>In <strong>Vercel</strong> → Project Settings → Environment Variables</li>
             <li>Add variable: <code style="background:#F3F4F6;padding:2px 6px;border-radius:4px;font-family:'DM Mono',monospace;font-size:12px;">RESEND_API_KEY</code> = your key</li>
-            <li>Redeploy the site (or trigger a new deploy)</li>
+            <li>Redeploy the site</li>
           </ol>
           <p style="margin-top:8px;">Until the API key is added, notification emails will be silently skipped.</p>
         </div>
@@ -891,7 +891,7 @@ async function submitBooking(){
 }
 
 async function sendNotif(data){
-  try{await fetch('/.netlify/functions/notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});}
+  try{await fetch('/api/notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});}
   catch(e){console.log('Notif failed:',e);}
 }
 

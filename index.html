@@ -32,6 +32,8 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--text);min
 .auth-tabs{display:flex;border:1px solid var(--border);border-radius:var(--rsm);overflow:hidden;margin-bottom:24px;}
 .auth-tab{flex:1;padding:9px;font-size:13px;font-weight:600;border:none;background:transparent;cursor:pointer;color:var(--muted);font-family:'Inter',sans-serif;}
 .auth-tab.active{background:var(--red);color:#fff;}
+.pass-eye{position:absolute;right:12px;top:31px;cursor:pointer;font-size:12px;font-weight:600;color:var(--red);user-select:none;padding:2px 6px;border-radius:4px;}
+.pass-eye:hover{background:var(--red-light);}
 
 /* HEADER */
 .header{background:var(--dark);height:58px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
@@ -241,13 +243,13 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--text);min
     <div id="auth-alert" style="display:none;"></div>
     <div id="login-form">
       <div class="fg"><label>Email</label><input type="email" id="login-email" placeholder="you@apera.ai"></div>
-      <div class="fg"><label>Password</label><input type="password" id="login-pass" placeholder="••••••••"></div>
+      <div class="fg" style="position:relative;"><label>Password</label><input type="password" id="login-pass" placeholder="••••••••"><span class="pass-eye" onclick="togglePass('login-pass',this)">Show</span></div>
       <button type="button" class="btn btn-primary" onclick="login()">Sign in</button>
     </div>
     <div id="signup-form" style="display:none;">
       <div class="fg"><label>Full name</label><input type="text" id="signup-name" placeholder="Sarah Mitchell"></div>
       <div class="fg"><label>Email</label><input type="email" id="signup-email" placeholder="you@apera.ai"></div>
-      <div class="fg"><label>Password</label><input type="password" id="signup-pass" placeholder="Min 6 characters"></div>
+      <div class="fg" style="position:relative;"><label>Password</label><input type="password" id="signup-pass" placeholder="Min 6 characters"><span class="pass-eye" onclick="togglePass('signup-pass',this)">Show</span></div>
       <button type="button" class="btn btn-primary" onclick="signup()">Create account</button>
     </div>
   </div>
@@ -484,6 +486,14 @@ var pendingFiles=[];
 var hasConflict=false;
 var leafletMap=null,mapMarkers=[],geocodeCache={},reportFilter='all';
 
+var appReady=false;
+
+function togglePass(id,el){
+  var inp=document.getElementById(id);
+  if(inp.type==='password'){inp.type='text';el.textContent='Hide';}
+  else{inp.type='password';el.textContent='Show';}
+}
+
 // ── AUTH ──────────────────────────────────────────────
 function switchAuth(m){
   document.getElementById('login-form').style.display=m==='login'?'block':'none';
@@ -525,18 +535,33 @@ async function logout(){
   document.getElementById('app').style.display='none';
 }
 
-// Fixed: use event type so page refresh restores session correctly
-sb.auth.onAuthStateChange(async function(event,session){
-  if(event==='INITIAL_SESSION'||event==='SIGNED_IN'){
-    if(session){
+// Explicit session check on page load — more reliable than onAuthStateChange alone
+(async function(){
+  try{
+    var{data:{session}}=await sb.auth.getSession();
+    if(session&&!appReady){
       currentUser=session.user;
       await loadProfile();
       initApp();
-    } else {
+    } else if(!session){
       document.getElementById('auth-screen').style.display='flex';
       document.getElementById('app').style.display='none';
     }
+  }catch(e){
+    console.error('Session check failed:',e);
+    document.getElementById('auth-screen').style.display='flex';
+    document.getElementById('app').style.display='none';
+  }
+})();
+
+// Listen for subsequent auth changes (login, logout, token refresh)
+sb.auth.onAuthStateChange(async function(event,session){
+  if(event==='SIGNED_IN'&&session&&!appReady){
+    currentUser=session.user;
+    await loadProfile();
+    initApp();
   } else if(event==='SIGNED_OUT'){
+    appReady=false;
     currentUser=null;currentProfile=null;
     document.getElementById('auth-screen').style.display='flex';
     document.getElementById('app').style.display='none';
@@ -550,6 +575,7 @@ async function loadProfile(){
 }
 
 function initApp(){
+  appReady=true;
   document.getElementById('auth-screen').style.display='none';
   document.getElementById('app').style.display='block';
   document.getElementById('user-pill').textContent=currentProfile.full_name||currentProfile.email;

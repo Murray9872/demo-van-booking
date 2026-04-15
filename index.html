@@ -242,13 +242,13 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--text);min
     <div id="login-form">
       <div class="fg"><label>Email</label><input type="email" id="login-email" placeholder="you@apera.ai"></div>
       <div class="fg"><label>Password</label><input type="password" id="login-pass" placeholder="••••••••"></div>
-      <button class="btn btn-primary" onclick="login()">Sign in</button>
+      <button type="button" class="btn btn-primary" onclick="login()">Sign in</button>
     </div>
     <div id="signup-form" style="display:none;">
       <div class="fg"><label>Full name</label><input type="text" id="signup-name" placeholder="Sarah Mitchell"></div>
       <div class="fg"><label>Email</label><input type="email" id="signup-email" placeholder="you@apera.ai"></div>
       <div class="fg"><label>Password</label><input type="password" id="signup-pass" placeholder="Min 6 characters"></div>
-      <button class="btn btn-primary" onclick="signup()">Create account</button>
+      <button type="button" class="btn btn-primary" onclick="signup()">Create account</button>
     </div>
   </div>
 </div>
@@ -383,7 +383,7 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--text);min
           <label>Notes</label>
           <textarea id="f-notes" placeholder="Plant access requirements, site contact, part types..."></textarea>
         </div>
-        <button class="btn btn-primary" id="btn-submit" onclick="submitBooking()">Request Booking</button>
+        <button type="button" class="btn btn-primary" id="btn-submit" onclick="submitBooking()">Request Booking</button>
       </div>
     </div>
   </div>
@@ -474,7 +474,8 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--text);min
 var SURL='https://gtcinsveqrwqakxentfo.supabase.co';
 var SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd0Y2luc3ZlcXJ3cWFreGVudGZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwOTQzMzksImV4cCI6MjA5MTY3MDMzOX0.BsCaAnqO0x7PsKoAnv776hQWAYx4Qihpp2znesLjBfU';
 var ADMIN_EMAIL='austin.murray@apera-ai.com';
-var sb=supabase.createClient(SURL,SKEY);
+var sb;
+try{sb=supabase.createClient(SURL,SKEY);}catch(e){console.error('Supabase init failed:',e);document.body.innerHTML='<div style="padding:40px;text-align:center;font-family:sans-serif;"><h2>Failed to load</h2><p>Please refresh the page.</p></div>';}
 
 var currentUser=null,currentProfile=null,allBookings=[];
 var calY=new Date().getFullYear(),calM=new Date().getMonth();
@@ -496,11 +497,16 @@ function showAuthAlert(msg,ok){
   el.textContent=msg;el.style.display='block';
 }
 async function login(){
-  var e=document.getElementById('login-email').value.trim();
-  var p=document.getElementById('login-pass').value;
-  if(!e||!p){showAuthAlert('Please enter email and password.');return;}
-  var{error}=await sb.auth.signInWithPassword({email:e,password:p});
-  if(error)showAuthAlert(error.message);
+  try{
+    var e=document.getElementById('login-email').value.trim();
+    var p=document.getElementById('login-pass').value;
+    if(!e||!p){showAuthAlert('Please enter email and password.');return;}
+    var result=await sb.auth.signInWithPassword({email:e,password:p});
+    if(result.error)showAuthAlert(result.error.message);
+  }catch(err){
+    console.error('Login error:',err);
+    showAuthAlert('Login failed: '+err.message);
+  }
 }
 async function signup(){
   var n=document.getElementById('signup-name').value.trim();

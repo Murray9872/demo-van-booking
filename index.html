@@ -527,10 +527,16 @@ async function signup(){
   var e=document.getElementById('signup-email').value.trim();
   var p=document.getElementById('signup-pass').value;
   if(!n||!e||!p){showAuthAlert('Please fill in all fields.');return;}
+  if(!e.endsWith('@apera-ai.com')){showAuthAlert('Only @apera-ai.com email addresses can register.');return;}
   if(p.length<6){showAuthAlert('Password must be at least 6 characters.');return;}
-  var{error}=await sb.auth.signUp({email:e,password:p,options:{data:{full_name:n,role:e===ADMIN_EMAIL?'admin':'user'}}});
-  if(error)showAuthAlert(error.message);
-  else showAuthAlert('Account created! Check your email to confirm.',true);
+  var result=await sb.auth.signUp({email:e,password:p,options:{data:{full_name:n,role:e===ADMIN_EMAIL?'admin':'user'}}});
+  if(result.error){showAuthAlert(result.error.message);return;}
+  // Auto-confirm: sign in immediately after signup
+  var login=await sb.auth.signInWithPassword({email:e,password:p});
+  if(login.error){showAuthAlert('Account created! Sign in with your new password.',true);return;}
+  currentUser=login.data.session.user;
+  await loadProfile();
+  initApp();
 }
 async function logout(){
   appReady=false;currentUser=null;currentProfile=null;

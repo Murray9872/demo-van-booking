@@ -276,6 +276,7 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--text);min
     <button class="nav-btn" id="nb-mine" onclick="showTab('mine')">My bookings</button>
     <button class="nav-btn" id="nb-reports" onclick="showTab('reports')">Reports</button>
     <button class="nav-btn" id="nb-admin" onclick="showTab('admin')" style="display:none;">Admin<span class="admin-count" id="admin-count" style="display:none;"></span></button>
+    <button class="nav-btn" id="nb-settings" onclick="showTab('settings')" style="display:none;">Settings</button>
   </div>
 
   <!-- BOOK TAB -->
@@ -470,6 +471,37 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--text);min
       </div>
     </div>
   </div>
+
+  <!-- SETTINGS TAB -->
+  <div id="tab-settings" style="display:none;">
+    <div class="container">
+      <div class="card">
+        <p class="sec-title">Email Notifications</p>
+        <div id="settings-alert" style="display:none;"></div>
+        <div class="fg">
+          <label>Notification recipients</label>
+          <textarea id="s-emails" rows="3" placeholder="austin.murray@apera-ai.com" style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--rsm);font-size:14px;font-family:'Inter',sans-serif;outline:none;resize:vertical;"></textarea>
+          <div style="font-size:12px;color:var(--muted);margin-top:6px;">One email per line. These people receive an email when a new booking is requested.</div>
+        </div>
+        <button type="button" class="btn btn-primary" style="max-width:200px;" onclick="saveSettings()">Save settings</button>
+      </div>
+      <div class="card">
+        <p class="sec-title">Email service setup</p>
+        <div style="font-size:13px;color:var(--muted);line-height:1.7;">
+          <p>Emails are sent via <strong>Resend</strong> (free tier — 100 emails/day).</p>
+          <p style="margin-top:8px;"><strong>Setup steps:</strong></p>
+          <ol style="margin:8px 0 0 20px;">
+            <li>Go to <strong>resend.com</strong> and create a free account</li>
+            <li>Copy your API key from the dashboard</li>
+            <li>In <strong>Netlify</strong> → Site settings → Environment variables</li>
+            <li>Add variable: <code style="background:#F3F4F6;padding:2px 6px;border-radius:4px;font-family:'DM Mono',monospace;font-size:12px;">RESEND_API_KEY</code> = your key</li>
+            <li>Redeploy the site (or trigger a new deploy)</li>
+          </ol>
+          <p style="margin-top:8px;">Until the API key is added, notification emails will be silently skipped.</p>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -483,6 +515,7 @@ var currentUser=null,currentProfile=null,allBookings=[];
 var calY=new Date().getFullYear(),calM=new Date().getMonth();
 var dpY=new Date().getFullYear(),dpM=new Date().getMonth(),dpOpen=false,selectedDate=null;
 var pendingFiles=[];
+var notificationEmails=[ADMIN_EMAIL];
 var hasConflict=false;
 var leafletMap=null,mapMarkers=[],geocodeCache={},reportFilter='all';
 
@@ -585,8 +618,10 @@ function initApp(){
   var isAdmin=currentProfile.role==='admin';
   document.getElementById('admin-pill').style.display=isAdmin?'inline':'none';
   document.getElementById('nb-admin').style.display=isAdmin?'block':'none';
+  document.getElementById('nb-settings').style.display=isAdmin?'block':'none';
   document.getElementById('f-rep').value=currentProfile.full_name||'';
   document.getElementById('f-email').value=currentProfile.email||'';
+  loadSettings();
   showTab('book');
   loadBookings();
   setupRealtime();
@@ -601,7 +636,7 @@ function setupRealtime(){
 
 // ── TABS ──────────────────────────────────────────────
 function showTab(id){
-  ['book','calendar','mine','reports','admin'].forEach(function(t){
+  ['book','calendar','mine','reports','admin','settings'].forEach(function(t){
     var el=document.getElementById('tab-'+t);
     var btn=document.getElementById('nb-'+t);
     if(el)el.style.display=t===id?'block':'none';
@@ -851,13 +886,39 @@ async function submitBooking(){
   document.getElementById('dp-display').classList.remove('filled');
   hasConflict=false;btn.disabled=false;btn.textContent='Request Booking';
 
-  sendNotif({type:'new_request',rep_name:rep,rep_email:email,account:acct,location:loc,demo_start_date:dateForNotif,duration_days:parseFloat(dur),demo_types:chips,notes:notes});
+  sendNotif({type:'new_request',to:notificationEmails,rep_name:rep,rep_email:email,account:acct,location:loc,demo_start_date:dateForNotif,duration_days:parseFloat(dur),demo_types:chips,notes:notes});
   await loadBookings();
 }
 
 async function sendNotif(data){
   try{await fetch('/.netlify/functions/notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});}
-  catch(e){}
+  catch(e){console.log('Notif failed:',e);}
+}
+
+// ── SETTINGS ──────────────────────────────────────────
+async function loadSettings(){
+  try{
+    var r=await sb.from('settings').select('*').eq('id',1).maybeSingle();
+    if(r.data&&r.data.notification_emails)notificationEmails=r.data.notification_emails;
+  }catch(e){}
+  var el=document.getElementById('s-emails');
+  if(el)el.value=notificationEmails.join('\n');
+}
+
+async function saveSettings(){
+  var raw=document.getElementById('s-emails').value;
+  var emails=raw.split(/[\n,]+/).map(function(e){return e.trim();}).filter(function(e){return e&&e.includes('@');});
+  if(!emails.length){showSettingsAlert('Please enter at least one valid email.',false);return;}
+  var{error}=await sb.from('settings').update({notification_emails:emails,updated_at:new Date().toISOString()}).eq('id',1);
+  if(error){showSettingsAlert('Error: '+error.message,false);}
+  else{notificationEmails=emails;showSettingsAlert('Settings saved!',true);}
+}
+
+function showSettingsAlert(msg,ok){
+  var el=document.getElementById('settings-alert');
+  el.className='alert '+(ok?'alert-ok':'alert-err');
+  el.textContent=msg;el.style.display='block';
+  setTimeout(function(){el.style.display='none';},4000);
 }
 
 // ── CALENDAR ──────────────────────────────────────────
@@ -936,9 +997,11 @@ async function setStatus(id,status){
   var n=document.getElementById('n-'+id);
   var upd={status:status};if(n)upd.coordinator_notes=n.value.trim();
   await sb.from('bookings').update(upd).eq('id',id);
-  if(status==='Confirmed'){
-    var b=allBookings.find(function(x){return x.id===id;});
-    if(b)sendNotif({type:'confirmation',rep_name:b.rep_name,rep_email:b.rep_email,account:b.account,location:b.location,demo_start_date:b.demo_start_date,duration_days:b.duration_days,demo_types:b.demo_types,coordinator_notes:upd.coordinator_notes||''});
+  var b=allBookings.find(function(x){return x.id===id;});
+  if(b){
+    if(status==='Confirmed')sendNotif({type:'confirmation',to:b.rep_email,rep_name:b.rep_name,rep_email:b.rep_email,account:b.account,location:b.location,demo_start_date:b.demo_start_date,duration_days:b.duration_days,demo_types:b.demo_types,coordinator_notes:upd.coordinator_notes||''});
+    if(status==='Cancelled')sendNotif({type:'denied',to:b.rep_email,rep_name:b.rep_name,account:b.account,location:b.location,demo_start_date:b.demo_start_date,duration_days:b.duration_days,coordinator_notes:upd.coordinator_notes||''});
+    if(status==='Pending')sendNotif({type:'hold',to:b.rep_email,rep_name:b.rep_name,account:b.account,location:b.location,demo_start_date:b.demo_start_date,duration_days:b.duration_days,coordinator_notes:upd.coordinator_notes||''});
   }
   await loadBookings();renderAdmin();
 }

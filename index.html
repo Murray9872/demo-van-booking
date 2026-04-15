@@ -550,12 +550,12 @@ async function startApp(session){
   }
 }
 
-// Single auth handler — responds to ALL session changes
+// Auth handler — only show login on explicit SIGNED_OUT (auth screen is visible by default)
 sb.auth.onAuthStateChange(async function(event,session){
-  console.log('Auth:',event,!!session);
-  if(session){
-    if(!appReady) await startApp(session);
-  } else {
+  console.log('Auth:',event,!!session,'appReady:',appReady);
+  if(session&&!appReady){
+    await startApp(session);
+  } else if(event==='SIGNED_OUT'){
     appReady=false;currentUser=null;currentProfile=null;
     showLogin();
   }

@@ -529,9 +529,8 @@ async function signup(){
   else showAuthAlert('Account created! Check your email to confirm.',true);
 }
 async function logout(){
-  appReady=false;
-  await sb.auth.signOut();
-  currentUser=null;currentProfile=null;
+  appReady=false;currentUser=null;currentProfile=null;
+  try{await sb.auth.signOut();}catch(e){}
   showLogin();
 }
 
@@ -540,39 +539,24 @@ function showLogin(){
   document.getElementById('app').style.display='none';
 }
 
-// On page load: check for existing session, clear stale tokens if broken
-(async function(){
+async function startApp(session){
   try{
-    var result=await sb.auth.getSession();
-    var session=result.data.session;
-    if(session){
-      currentUser=session.user;
-      await loadProfile();
-      initApp();
-    } else {
-      // No valid session — clear any stale auth data so fresh login works
-      await sb.auth.signOut();
-      showLogin();
-    }
+    currentUser=session.user;
+    await loadProfile();
+    initApp();
   }catch(e){
-    console.error('Session restore failed:',e);
-    // Clear broken session so user can log in fresh
-    try{await sb.auth.signOut();}catch(e2){}
+    console.error('startApp failed:',e);
     showLogin();
   }
-})();
+}
 
-// Handle login/logout events after page load
+// Single auth handler — responds to ALL session changes
 sb.auth.onAuthStateChange(async function(event,session){
-  if((event==='SIGNED_IN'||event==='TOKEN_REFRESHED')&&session){
-    if(!appReady){
-      currentUser=session.user;
-      await loadProfile();
-      initApp();
-    }
-  } else if(event==='SIGNED_OUT'){
-    appReady=false;
-    currentUser=null;currentProfile=null;
+  console.log('Auth:',event,!!session);
+  if(session){
+    if(!appReady) await startApp(session);
+  } else {
+    appReady=false;currentUser=null;currentProfile=null;
     showLogin();
   }
 });
@@ -580,10 +564,8 @@ sb.auth.onAuthStateChange(async function(event,session){
 async function loadProfile(){
   try{
     var result=await sb.from('profiles').select('*').eq('id',currentUser.id).maybeSingle();
-    var data=result.data;
-    currentProfile=data||{email:currentUser.email,full_name:currentUser.user_metadata?.full_name||currentUser.email,role:'user'};
+    currentProfile=result.data||{email:currentUser.email,full_name:currentUser.user_metadata?.full_name||currentUser.email,role:'user'};
   }catch(e){
-    // Profile query failed — fall back to auth metadata
     currentProfile={email:currentUser.email,full_name:currentUser.user_metadata?.full_name||currentUser.email,role:'user'};
   }
   if(currentProfile.email===ADMIN_EMAIL)currentProfile.role='admin';

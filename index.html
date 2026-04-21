@@ -245,6 +245,18 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--text);min
       <div class="fg"><label>Email</label><input type="email" id="login-email" placeholder="you@apera.ai"></div>
       <div class="fg" style="position:relative;"><label>Password</label><input type="password" id="login-pass" placeholder="••••••••"><span class="pass-eye" onclick="togglePass('login-pass',this)">Show</span></div>
       <button type="button" class="btn btn-primary" onclick="login()">Sign in</button>
+      <div style="text-align:center;margin-top:12px;"><a href="#" onclick="showForgotPw();return false;" style="font-size:13px;color:var(--red);text-decoration:none;font-weight:500;">Forgot password?</a></div>
+    </div>
+    <div id="forgot-form" style="display:none;">
+      <div class="fg"><label>Email</label><input type="email" id="forgot-email" placeholder="you@apera.ai"></div>
+      <button type="button" class="btn btn-primary" onclick="sendResetLink()">Send reset link</button>
+      <div style="text-align:center;margin-top:12px;"><a href="#" onclick="switchAuth('login');return false;" style="font-size:13px;color:var(--muted);text-decoration:none;">Back to sign in</a></div>
+    </div>
+    <div id="update-pw-form" style="display:none;">
+      <p style="font-size:14px;margin-bottom:16px;color:var(--text);">Set your new password:</p>
+      <div class="fg" style="position:relative;"><label>New Password</label><input type="password" id="new-pass" placeholder="Min 6 characters"><span class="pass-eye" onclick="togglePass('new-pass',this)">Show</span></div>
+      <div class="fg" style="position:relative;"><label>Confirm Password</label><input type="password" id="confirm-pass" placeholder="Confirm password"><span class="pass-eye" onclick="togglePass('confirm-pass',this)">Show</span></div>
+      <button type="button" class="btn btn-primary" onclick="updatePassword()">Update password</button>
     </div>
     <div id="signup-form" style="display:none;">
       <div class="fg"><label>Full name</label><input type="text" id="signup-name" placeholder="Sarah Mitchell"></div>
@@ -461,12 +473,27 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--text);min
   <!-- ADMIN TAB -->
   <div id="tab-admin" style="display:none;">
     <div class="container">
+      <!-- Summary bar -->
+      <div class="card" style="padding:16px 24px;">
+        <div id="admin-summary" style="display:flex;gap:24px;flex-wrap:wrap;font-size:13px;font-weight:600;"></div>
+      </div>
       <div class="card">
         <p class="sec-title">Pending approval</p>
         <div id="admin-pending"><div class="empty">No pending bookings.</div></div>
       </div>
       <div class="card" style="margin-top:16px;">
-        <p class="sec-title">All bookings</p>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+          <p class="sec-title" style="margin-bottom:0;padding-bottom:0;border-bottom:none;">All bookings</p>
+          <button type="button" class="export-btn" onclick="adminExportCSV()">↓ Export CSV</button>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+          <button type="button" class="filter-btn active" onclick="setAdminFilter('all',this)">All</button>
+          <button type="button" class="filter-btn" onclick="setAdminFilter('Requested',this)">Requested</button>
+          <button type="button" class="filter-btn" onclick="setAdminFilter('Confirmed',this)">Confirmed</button>
+          <button type="button" class="filter-btn" onclick="setAdminFilter('Pending',this)">Pending</button>
+          <button type="button" class="filter-btn" onclick="setAdminFilter('Cancelled',this)">Cancelled</button>
+          <input type="text" id="admin-search" placeholder="Search account, location, rep..." oninput="adminSearch=this.value;renderAdmin()" style="padding:6px 12px;border:1.5px solid var(--border);border-radius:20px;font-size:12px;font-family:'Inter',sans-serif;outline:none;width:220px;margin-left:auto;">
+        </div>
         <div id="admin-all"><div class="empty">No bookings yet.</div></div>
       </div>
     </div>
@@ -507,7 +534,8 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--text);min
 <script>
 var SURL='https://gtcinsveqrwqakxentfo.supabase.co';
 var SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd0Y2luc3ZlcXJ3cWFreGVudGZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwOTQzMzksImV4cCI6MjA5MTY3MDMzOX0.BsCaAnqO0x7PsKoAnv776hQWAYx4Qihpp2znesLjBfU';
-var ADMIN_EMAIL='austin.murray@apera-ai.com';
+// To add future admins, add their @apera-ai.com email to this array
+var ADMIN_EMAILS=['austin.murray@apera-ai.com','yannick.bertrand@apera-ai.com'];
 var sb;
 try{sb=supabase.createClient(SURL,SKEY,{auth:{persistSession:true,lock:async function(name,acquireTimeout,fn){return await fn();}}});}catch(e){console.error('Supabase init failed:',e);document.body.innerHTML='<div style="padding:40px;text-align:center;font-family:sans-serif;"><h2>Failed to load</h2><p>Please refresh the page.</p></div>';}
 
@@ -515,7 +543,8 @@ var currentUser=null,currentProfile=null,allBookings=[];
 var calY=new Date().getFullYear(),calM=new Date().getMonth();
 var dpY=new Date().getFullYear(),dpM=new Date().getMonth(),dpOpen=false,selectedDate=null;
 var pendingFiles=[];
-var notificationEmails=[ADMIN_EMAIL];
+var notificationEmails=ADMIN_EMAILS.slice();
+var adminStatusFilter='all',adminSearch='';
 var hasConflict=false;
 var leafletMap=null,mapMarkers=[],geocodeCache={},reportFilter='all';
 
@@ -531,8 +560,49 @@ function togglePass(id,el){
 function switchAuth(m){
   document.getElementById('login-form').style.display=m==='login'?'block':'none';
   document.getElementById('signup-form').style.display=m==='signup'?'block':'none';
+  document.getElementById('forgot-form').style.display='none';
+  document.getElementById('update-pw-form').style.display='none';
   document.querySelectorAll('.auth-tab').forEach(function(t,i){t.classList.toggle('active',(i===0&&m==='login')||(i===1&&m==='signup'));});
   document.getElementById('auth-alert').style.display='none';
+}
+
+function showForgotPw(){
+  document.getElementById('login-form').style.display='none';
+  document.getElementById('signup-form').style.display='none';
+  document.getElementById('forgot-form').style.display='block';
+  document.getElementById('auth-alert').style.display='none';
+}
+
+async function sendResetLink(){
+  var email=document.getElementById('forgot-email').value.trim();
+  if(!email){showAuthAlert('Please enter your email.');return;}
+  try{
+    var{error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:'https://demo-van-booking.vercel.app'});
+    if(error){showAuthAlert(error.message);return;}
+    showAuthAlert('Check your email for a password reset link.',true);
+  }catch(e){showAuthAlert('Error: '+e.message);}
+}
+
+function showUpdatePwForm(){
+  document.getElementById('login-form').style.display='none';
+  document.getElementById('signup-form').style.display='none';
+  document.getElementById('forgot-form').style.display='none';
+  document.getElementById('update-pw-form').style.display='block';
+  document.getElementById('auth-screen').style.display='flex';
+  document.getElementById('app').style.display='none';
+}
+
+async function updatePassword(){
+  var p=document.getElementById('new-pass').value;
+  var c=document.getElementById('confirm-pass').value;
+  if(!p||p.length<6){showAuthAlert('Password must be at least 6 characters.');return;}
+  if(p!==c){showAuthAlert('Passwords do not match.');return;}
+  try{
+    var{error}=await sb.auth.updateUser({password:p});
+    if(error){showAuthAlert(error.message);return;}
+    showAuthAlert('Password updated! Redirecting...',true);
+    setTimeout(function(){location.reload();},2000);
+  }catch(e){showAuthAlert('Error: '+e.message);}
 }
 function showAuthAlert(msg,ok){
   var el=document.getElementById('auth-alert');
@@ -562,7 +632,7 @@ async function signup(){
   if(!n||!e||!p){showAuthAlert('Please fill in all fields.');return;}
   if(!e.endsWith('@apera-ai.com')){showAuthAlert('Only @apera-ai.com email addresses can register.');return;}
   if(p.length<6){showAuthAlert('Password must be at least 6 characters.');return;}
-  var result=await sb.auth.signUp({email:e,password:p,options:{data:{full_name:n,role:e===ADMIN_EMAIL?'admin':'user'}}});
+  var result=await sb.auth.signUp({email:e,password:p,options:{data:{full_name:n,role:ADMIN_EMAILS.includes(e)?'admin':'user'}}});
   if(result.error){showAuthAlert(result.error.message);return;}
   // Auto-confirm: sign in immediately after signup
   var login=await sb.auth.signInWithPassword({email:e,password:p});
@@ -597,6 +667,7 @@ function showLogin(){
 // Only handle token refresh and logout — login is handled directly in login()
 sb.auth.onAuthStateChange(function(event,session){
   if(event==='TOKEN_REFRESHED'&&session){currentUser=session.user;}
+  else if(event==='PASSWORD_RECOVERY'){showUpdatePwForm();}
   else if(event==='SIGNED_OUT'){appReady=false;currentUser=null;currentProfile=null;showLogin();}
 });
 
@@ -607,7 +678,7 @@ async function loadProfile(){
   }catch(e){
     currentProfile={email:currentUser.email,full_name:currentUser.user_metadata?.full_name||currentUser.email,role:'user'};
   }
-  if(currentProfile.email===ADMIN_EMAIL)currentProfile.role='admin';
+  if(ADMIN_EMAILS.includes(currentProfile.email))currentProfile.role='admin';
 }
 
 function initApp(){
@@ -972,26 +1043,102 @@ function renderMine(){
 }
 
 // ── ADMIN ─────────────────────────────────────────────
+function setAdminFilter(f,btn){
+  adminStatusFilter=f;
+  document.querySelectorAll('#tab-admin .filter-btn').forEach(function(b){b.classList.remove('active');});
+  if(btn)btn.classList.add('active');
+  renderAdmin();
+}
+
+function getAdminFiltered(){
+  var list=allBookings.slice();
+  if(adminStatusFilter!=='all')list=list.filter(function(b){return b.status===adminStatusFilter;});
+  if(adminSearch){
+    var q=adminSearch.toLowerCase();
+    list=list.filter(function(b){
+      return (b.account||'').toLowerCase().includes(q)||(b.location||'').toLowerCase().includes(q)||(b.rep_name||'').toLowerCase().includes(q)||(b.rep_email||'').toLowerCase().includes(q);
+    });
+  }
+  return list;
+}
+
 function renderAdmin(){
   if(currentProfile.role!=='admin')return;
-  var pend=allBookings.filter(function(b){return b.status==='Requested';});
+  // Summary bar
+  var total=allBookings.length,req=0,conf=0,pend=0,canc=0;
+  allBookings.forEach(function(b){if(b.status==='Requested')req++;else if(b.status==='Confirmed')conf++;else if(b.status==='Pending')pend++;else if(b.status==='Cancelled')canc++;});
+  document.getElementById('admin-summary').innerHTML='<span>Total: <strong>'+total+'</strong></span><span style="color:#374151;">Requested: <strong>'+req+'</strong></span><span style="color:#065F46;">Confirmed: <strong>'+conf+'</strong></span><span style="color:#92400E;">Pending: <strong>'+pend+'</strong></span><span style="color:#991B1B;">Cancelled: <strong>'+canc+'</strong></span>';
+
+  // Pending section
+  var pendList=allBookings.filter(function(b){return b.status==='Requested';});
   var pEl=document.getElementById('admin-pending');
-  pEl.innerHTML=pend.length?pend.map(function(b){return adminRow(b,true);}).join(''):'<div class="empty">No pending bookings.</div>';
+  pEl.innerHTML=pendList.length?pendList.map(function(b){return adminRow(b,true);}).join(''):'<div class="empty">No pending bookings.</div>';
+
+  // All bookings (filtered)
+  var filtered=getAdminFiltered();
   var aEl=document.getElementById('admin-all');
-  aEl.innerHTML=allBookings.length?allBookings.map(function(b){return adminRow(b,false);}).join(''):'<div class="empty">No bookings yet.</div>';
+  aEl.innerHTML=filtered.length?filtered.map(function(b){return adminRow(b,false);}).join(''):'<div class="empty">No bookings match your filters.</div>';
 }
-function adminRow(b,actions){
+
+function adminRow(b,isPending){
   var dur=b.duration_days<1?'Half day':b.duration_days+' day'+(b.duration_days>1?'s':'');
-  var contact=b.contact_name||b.contact_email||b.contact_phone?'<div style="font-size:12px;color:var(--muted);margin-top:2px;">Contact: '+(b.contact_name||'')+(b.contact_email?' · '+b.contact_email:'')+(b.contact_phone?' · '+b.contact_phone:'')+'</div>':'';
+  var contact='';
+  if(b.contact_name||b.contact_email||b.contact_phone){
+    contact='<div style="font-size:12px;color:var(--muted);margin-top:4px;"><strong>Plant contact:</strong> '+(b.contact_name||'')+(b.contact_email?' · '+b.contact_email:'')+(b.contact_phone?' · '+b.contact_phone:'')+'</div>';
+  }
+  var chips=(b.demo_types||[]).map(function(t){return '<span style="display:inline-block;padding:2px 8px;background:#F3F4F6;border:1px solid var(--border);border-radius:12px;font-size:11px;font-weight:500;margin:2px 2px 0 0;">'+t+'</span>';}).join('');
+  var notes=b.notes?'<div style="font-size:12px;color:var(--muted);margin-top:4px;"><strong>Notes:</strong> '+b.notes+'</div>':'';
   var fc=(b.files||[]).length;
-  var fHtml=fc?'<span style="font-size:11px;color:var(--muted);">'+fc+' file'+(fc>1?'s':'')+' — <span style="color:var(--red);cursor:pointer;" onclick="adminViewFiles(\''+b.id+'\')">view</span></span>':'';
-  var act=actions?'<div style="margin-top:8px;"><textarea class="notes-input" id="n-'+b.id+'" rows="2" placeholder="Add coordinator note...">'+(b.coordinator_notes||'')+'</textarea><div class="brow-actions" style="margin-top:6px;"><button class="btn btn-sm btn-approve" onclick="setStatus(\''+b.id+'\',\'Confirmed\')">Confirm</button><button class="btn btn-sm btn-reject" onclick="setStatus(\''+b.id+'\',\'Pending\')">Hold</button><button class="btn btn-sm btn-ghost" onclick="setStatus(\''+b.id+'\',\'Cancelled\')">Cancel</button></div></div>'
-    :'<div class="brow-actions" style="margin-top:6px;">'+(b.status!=='Confirmed'?'<button class="btn btn-sm btn-approve" onclick="setStatus(\''+b.id+'\',\'Confirmed\')">Confirm</button>':'')+(b.status!=='Cancelled'?'<button class="btn btn-sm btn-ghost" onclick="setStatus(\''+b.id+'\',\'Cancelled\')">Cancel</button>':'')+'</div>';
-  return '<div class="brow" style="flex-direction:column;align-items:stretch;"><div style="display:flex;align-items:flex-start;gap:12px;"><div class="brow-main"><div class="brow-acct">'+b.account+'</div><div class="brow-meta">'+b.location+' · '+fmtDate(b.demo_start_date)+' · '+dur+' · '+b.rep_name+' ('+b.rep_email+')</div>'+contact+'<div class="brow-types">'+(b.demo_types||[]).join(', ')+(b.notes?'<br>'+b.notes:'')+'</div>'+fHtml+'</div><span class="badge '+badgeCls(b.status)+'">'+b.status+'</span></div>'+act+'</div>';
+  var filesHtml='';
+  if(fc){
+    filesHtml='<div style="margin-top:6px;font-size:12px;"><strong style="color:var(--text);">📎 '+fc+' file'+(fc>1?'s':'')+':</strong> '
+      +(b.files||[]).map(function(f){var n=f.split('/').pop().replace(/^\d+-/,'');return '<a href="#" onclick="dlFile(\''+f+'\');return false;" style="color:var(--red);margin-left:6px;">'+n+'</a>';}).join('')
+      +'</div>';
+  }
+  // Status dropdown
+  var statusSelect='<select onchange="setStatus(\''+b.id+'\',this.value)" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:\'DM Mono\',monospace;font-weight:600;background:#fff;cursor:pointer;">'
+    +'<option value="Requested"'+(b.status==='Requested'?' selected':'')+'>Requested</option>'
+    +'<option value="Confirmed"'+(b.status==='Confirmed'?' selected':'')+'>Confirmed</option>'
+    +'<option value="Pending"'+(b.status==='Pending'?' selected':'')+'>Pending</option>'
+    +'<option value="Cancelled"'+(b.status==='Cancelled'?' selected':'')+'>Cancelled</option>'
+    +'</select>';
+  // Coordinator notes (inline, auto-save)
+  var coordNotes='<div style="margin-top:8px;"><textarea class="notes-input" id="n-'+b.id+'" rows="2" placeholder="Coordinator notes..." onblur="saveCoordNotes(\''+b.id+'\')">'+(b.coordinator_notes||'')+'</textarea></div>';
+  // Pending actions
+  var actions=isPending?'<div class="brow-actions" style="margin-top:6px;"><button type="button" class="btn btn-sm btn-approve" onclick="setStatus(\''+b.id+'\',\'Confirmed\')">Confirm</button><button type="button" class="btn btn-sm btn-reject" onclick="setStatus(\''+b.id+'\',\'Pending\')">Hold</button><button type="button" class="btn btn-sm btn-ghost" onclick="setStatus(\''+b.id+'\',\'Cancelled\')">Cancel</button></div>':'';
+  // Upload button
+  var uploadBtn='<label style="cursor:pointer;display:inline-flex;align-items:center;gap:4px;margin-top:6px;"><input type="file" multiple accept="*/*" style="display:none;" onchange="uploadLater(\''+b.id+'\',this)"><span style="padding:3px 10px;background:#F3F4F6;border:1px solid var(--border);border-radius:6px;font-size:11px;font-weight:600;color:#374151;">📎 Add files</span></label>';
+
+  return '<div class="brow" style="flex-direction:column;align-items:stretch;">'
+    +'<div style="display:flex;align-items:flex-start;gap:12px;">'
+    +'<div class="brow-main"><div class="brow-acct">'+b.account+'</div>'
+    +'<div class="brow-meta">'+b.location+' · '+fmtDate(b.demo_start_date)+' · '+dur+' · '+b.rep_name+' ('+b.rep_email+')</div>'
+    +'<div style="margin-top:4px;">'+chips+'</div>'
+    +contact+notes+filesHtml+uploadBtn
+    +'</div>'
+    +'<div style="text-align:right;">'+statusSelect+'</div>'
+    +'</div>'
+    +coordNotes+actions
+    +'</div>';
 }
+
+async function saveCoordNotes(id){
+  var el=document.getElementById('n-'+id);
+  if(!el)return;
+  await sb.from('bookings').update({coordinator_notes:el.value.trim()}).eq('id',id);
+}
+
 async function adminViewFiles(id){
   var b=allBookings.find(function(x){return x.id===id;});
   if(b&&b.files)b.files.forEach(function(f){dlFile(f);});
+}
+
+function adminExportCSV(){
+  var list=getAdminFiltered();if(!list.length)return;
+  var rows=[['Account','Location','Start Date','Duration','Demo Types','Rep Name','Rep Email','Contact Name','Contact Email','Contact Phone','Status','Notes','Coordinator Notes','Created At']];
+  list.forEach(function(b){rows.push([b.account,b.location,b.demo_start_date,b.duration_days,(b.demo_types||[]).join('; '),b.rep_name,b.rep_email,b.contact_name||'',b.contact_email||'',b.contact_phone||'',b.status,b.notes||'',b.coordinator_notes||'',b.created_at||'']);});
+  var csv=rows.map(function(r){return r.map(function(v){return '"'+String(v||'').replace(/"/g,'""')+'"';}).join(',');}).join('\n');
+  var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='admin-bookings-'+new Date().toISOString().split('T')[0]+'.csv';a.click();
 }
 async function setStatus(id,status){
   var n=document.getElementById('n-'+id);

@@ -510,6 +510,13 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--text);min
           <textarea id="s-emails" rows="3" placeholder="austin.murray@apera-ai.com" style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--rsm);font-size:14px;font-family:'Inter',sans-serif;outline:none;resize:vertical;"></textarea>
           <div style="font-size:12px;color:var(--muted);margin-top:6px;">One email per line. These people receive an email when a new booking is requested.</div>
         </div>
+        <div class="divider"></div>
+        <p class="sec-title">Travel buffer</p>
+        <div class="fg">
+          <label>Skip travel day if within (miles)</label>
+          <input type="number" id="s-miles" min="0" max="1000" value="100" style="max-width:140px;">
+          <div style="font-size:12px;color:var(--muted);margin-top:6px;">If two bookings are closer than this distance, the 1-day travel buffer between them is removed.</div>
+        </div>
         <button type="button" class="btn btn-primary" style="max-width:200px;" onclick="saveSettings()">Save settings</button>
       </div>
       <div class="card">
@@ -544,6 +551,7 @@ var calY=new Date().getFullYear(),calM=new Date().getMonth();
 var dpY=new Date().getFullYear(),dpM=new Date().getMonth(),dpOpen=false,selectedDate=null;
 var pendingFiles=[];
 var notificationEmails=ADMIN_EMAILS.slice();
+var travelBufferMiles=100;
 var adminStatusFilter='all',adminSearch='';
 var hasConflict=false;
 var leafletMap=null,mapMarkers=[],geocodeCache={},reportFilter='all';
@@ -806,9 +814,9 @@ function bookedMap(userLoc){
       var prev=active[i-1];
       var prevEnd=addDays(prev.demo_start_date,parseFloat(prev.duration_days||1)-1);
       // Only relevant if prev booking is adjacent (ends day before travel day or later)
-      if(locDist(b.location,prev.location)<100) needBefore=false;
+      if(locDist(b.location,prev.location)<travelBufferMiles) needBefore=false;
     }
-    if(userLoc&&locDist(b.location,userLoc)<100) needBefore=false;
+    if(userLoc&&locDist(b.location,userLoc)<travelBufferMiles) needBefore=false;
     if(needBefore&&!m[beforeDate]) m[beforeDate]={status:'travel',state:'',loc:''};
 
     // Travel AFTER: skip if next booking is <100mi away
@@ -816,9 +824,9 @@ function bookedMap(userLoc){
     var needAfter=true;
     if(i<active.length-1){
       var next=active[i+1];
-      if(locDist(b.location,next.location)<100) needAfter=false;
+      if(locDist(b.location,next.location)<travelBufferMiles) needAfter=false;
     }
-    if(userLoc&&locDist(b.location,userLoc)<100) needAfter=false;
+    if(userLoc&&locDist(b.location,userLoc)<travelBufferMiles) needAfter=false;
     if(needAfter&&!m[afterDate]) m[afterDate]={status:'travel',state:'',loc:''};
   }
   return m;
@@ -917,7 +925,7 @@ function checkConflict(){
     var b=allBookings[i];if(b.status==='Cancelled')continue;
     var bd=parseFloat(b.duration_days||1);
     // Determine travel buffer based on distance
-    var nearby=userLoc&&locDist(userLoc,b.location)<100;
+    var nearby=userLoc&&locDist(userLoc,b.location)<travelBufferMiles;
     var bufferBefore=nearby?0:1;
     var bufferAfter=nearby?0:1;
     var bs=addDays(b.demo_start_date,-bufferBefore);
@@ -927,7 +935,7 @@ function checkConflict(){
   if(conflict){
     hasConflict=true;
     var ce=addDays(conflict.demo_start_date,Math.max(parseFloat(conflict.duration_days||1)-1,0));
-    var nearby2=userLoc&&locDist(userLoc,conflict.location)<100;
+    var nearby2=userLoc&&locDist(userLoc,conflict.location)<travelBufferMiles;
     alertEl.innerHTML='Van unavailable — conflicts with <strong>'+conflict.account+'</strong> on '+fmtDate(conflict.demo_start_date)+(ce!==conflict.demo_start_date?' – '+fmtDate(ce):'')+(nearby2?'':' (includes travel buffer)');
     alertEl.style.display='block';btn.disabled=true;
   } else {
@@ -1043,19 +1051,25 @@ async function sendNotif(data){
 async function loadSettings(){
   try{
     var r=await sb.from('settings').select('*').eq('id',1).maybeSingle();
-    if(r.data&&r.data.notification_emails)notificationEmails=r.data.notification_emails;
+    if(r.data){
+      if(r.data.notification_emails)notificationEmails=r.data.notification_emails;
+      if(r.data.travel_buffer_miles!=null)travelBufferMiles=r.data.travel_buffer_miles;
+    }
   }catch(e){}
   var el=document.getElementById('s-emails');
   if(el)el.value=notificationEmails.join('\n');
+  var ml=document.getElementById('s-miles');
+  if(ml)ml.value=travelBufferMiles;
 }
 
 async function saveSettings(){
   var raw=document.getElementById('s-emails').value;
   var emails=raw.split(/[\n,]+/).map(function(e){return e.trim();}).filter(function(e){return e&&e.includes('@');});
   if(!emails.length){showSettingsAlert('Please enter at least one valid email.',false);return;}
-  var{error}=await sb.from('settings').update({notification_emails:emails,updated_at:new Date().toISOString()}).eq('id',1);
+  var miles=parseInt(document.getElementById('s-miles').value)||100;
+  var{error}=await sb.from('settings').update({notification_emails:emails,travel_buffer_miles:miles,updated_at:new Date().toISOString()}).eq('id',1);
   if(error){showSettingsAlert('Error: '+error.message,false);}
-  else{notificationEmails=emails;showSettingsAlert('Settings saved!',true);}
+  else{notificationEmails=emails;travelBufferMiles=miles;showSettingsAlert('Settings saved!',true);}
 }
 
 function showSettingsAlert(msg,ok){

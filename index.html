@@ -1032,14 +1032,95 @@ function renderMine(){
     return '<div class="brow" style="flex-direction:column;align-items:stretch;">'
       +'<div style="display:flex;align-items:flex-start;gap:12px;">'
       +'<div class="brow-main"><div class="brow-acct">'+b.account+'</div><div class="brow-meta">'+b.location+' · '+fmtDate(b.demo_start_date)+' · '+dur+'</div>'+contact
-      +'<div class="brow-types">'+(b.demo_types||[]).join(', ')+(b.coordinator_notes?'<br><em>Note: '+b.coordinator_notes+'</em>':'')+'</div>'+filesHtml+'</div>'
+      +'<div class="brow-types">'+(b.demo_types||[]).join(', ')+(b.coordinator_notes?'<br><em>Coordinator: '+b.coordinator_notes+'</em>':'')+'</div>'+filesHtml+'</div>'
       +'<span class="badge '+badgeCls(b.status)+'">'+b.status+'</span></div>'
-      +'<div style="margin-top:8px;"><label style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;">'
-      +'<input type="file" multiple accept=".step,.stp,.stl,.pdf,.zip,.png,.jpg" style="display:none;" onchange="uploadLater(\''+b.id+'\',this)">'
-      +'<span style="padding:4px 12px;background:#F3F4F6;border:1px solid var(--border);border-radius:6px;font-size:12px;font-weight:600;color:#374151;">📎 Upload CAD files</span>'
-      +'</label>'+(files.length?'<span style="font-size:11px;color:var(--muted);margin-left:8px;">'+files.length+' file'+(files.length>1?'s':'')+' attached</span>':'')+'</div>'
+      +'<div style="margin-top:8px;display:flex;gap:8px;align-items:center;">'
+      +'<button type="button" class="btn btn-sm btn-ghost" onclick="toggleEditForm(\''+b.id+'\')">Edit</button>'
+      +'<label style="cursor:pointer;display:inline-flex;align-items:center;gap:4px;">'
+      +'<input type="file" multiple accept="*/*" style="display:none;" onchange="uploadLater(\''+b.id+'\',this)">'
+      +'<span style="padding:4px 12px;background:#F3F4F6;border:1px solid var(--border);border-radius:6px;font-size:12px;font-weight:600;color:#374151;">📎 Upload files</span>'
+      +'</label>'+(files.length?'<span style="font-size:11px;color:var(--muted);">'+files.length+' file'+(files.length>1?'s':'')+'</span>':'')
+      +'</div>'
+      +'<div id="edit-'+b.id+'" style="display:none;"></div>'
       +'</div>';
   }).join('');
+}
+
+// ── EDIT BOOKING ──────────────────────────────────────
+function toggleEditForm(id){
+  var el=document.getElementById('edit-'+id);
+  if(!el)return;
+  if(el.style.display==='block'){el.style.display='none';return;}
+  var b=allBookings.find(function(x){return x.id===id;});
+  if(!b)return;
+  var isAdmin=currentProfile.role==='admin';
+  var types=['Bin picking','Dunnage picking','De-racking','Machine tending','Assembly','Sorting'];
+  var selTypes=b.demo_types||[];
+  var chipsHtml=types.map(function(t){return '<span class="chip'+(selTypes.includes(t)?' on':'')+'" onclick="this.classList.toggle(\'on\')">'+t+'</span>';}).join('');
+  var durOpts=[{v:'0.5',l:'Half day'},{v:'1',l:'1 day'},{v:'2',l:'2 days'},{v:'3',l:'3 days'},{v:'4',l:'4 days'},{v:'5',l:'5 days'}];
+  var durSel=durOpts.map(function(o){return '<option value="'+o.v+'"'+(parseFloat(b.duration_days)==parseFloat(o.v)?' selected':'')+'>'+o.l+'</option>';}).join('');
+
+  el.innerHTML='<div class="card" style="margin-top:12px;background:#FAFBFC;">'
+    +'<p class="sec-title">Edit booking</p>'
+    +'<div id="edit-alert-'+id+'" style="display:none;"></div>'
+    +'<div class="fg"><label>Customer / Account</label><input type="text" id="ed-acct-'+id+'" value="'+esc(b.account)+'"></div>'
+    +'<div class="form-row">'
+    +'<div class="fg"><label>Demo Location</label><input type="text" id="ed-loc-'+id+'" value="'+esc(b.location)+'"></div>'
+    +'<div class="fg"><label>Start Date</label><input type="date" id="ed-date-'+id+'" value="'+b.demo_start_date+'"></div>'
+    +'</div>'
+    +'<div class="fg"><label>Duration</label><select id="ed-dur-'+id+'"><option value="">Select...</option>'+durSel+'</select></div>'
+    +'<div class="fg"><label>Demo Types</label><div class="chips" id="ed-chips-'+id+'">'+chipsHtml+'</div></div>'
+    +'<div class="form-row-3">'
+    +'<div class="fg"><label>Contact Name</label><input type="text" id="ed-cn-'+id+'" value="'+esc(b.contact_name||'')+'"></div>'
+    +'<div class="fg"><label>Contact Email</label><input type="email" id="ed-ce-'+id+'" value="'+esc(b.contact_email||'')+'"></div>'
+    +'<div class="fg"><label>Contact Phone</label><input type="tel" id="ed-cp-'+id+'" value="'+esc(b.contact_phone||'')+'"></div>'
+    +'</div>'
+    +'<div class="fg"><label>Notes</label><textarea id="ed-notes-'+id+'" style="width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--rsm);font-size:14px;font-family:Inter,sans-serif;min-height:60px;outline:none;resize:vertical;">'+esc(b.notes||'')+'</textarea></div>'
+    +'<div style="display:flex;gap:8px;"><button type="button" class="btn btn-primary" style="width:auto;padding:10px 24px;" onclick="saveEdit(\''+id+'\')">Save changes</button><button type="button" class="btn btn-ghost" onclick="toggleEditForm(\''+id+'\')">Cancel</button></div>'
+    +'<div style="font-size:11px;color:var(--muted);margin-top:8px;">If you change the date or duration, the booking will be sent back for re-approval.</div>'
+    +'</div>';
+  el.style.display='block';
+}
+
+function esc(s){return String(s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
+
+async function saveEdit(id){
+  var b=allBookings.find(function(x){return x.id===id;});
+  if(!b)return;
+  var acct=document.getElementById('ed-acct-'+id).value.trim();
+  var loc=document.getElementById('ed-loc-'+id).value.trim();
+  var date=document.getElementById('ed-date-'+id).value;
+  var dur=document.getElementById('ed-dur-'+id).value;
+  var chips=Array.from(document.querySelectorAll('#ed-chips-'+id+' .chip.on')).map(function(c){return c.textContent;});
+  var cn=document.getElementById('ed-cn-'+id).value.trim();
+  var ce=document.getElementById('ed-ce-'+id).value.trim();
+  var cp=document.getElementById('ed-cp-'+id).value.trim();
+  var notes=document.getElementById('ed-notes-'+id).value.trim();
+  var alertEl=document.getElementById('edit-alert-'+id);
+
+  if(!acct||!loc||!date||!dur){
+    alertEl.className='alert alert-err';alertEl.textContent='Please fill in all required fields.';alertEl.style.display='block';return;
+  }
+
+  var upd={account:acct,location:loc,demo_start_date:date,duration_days:parseFloat(dur),demo_types:chips,contact_name:cn||null,contact_email:ce||null,contact_phone:cp||null,notes:notes};
+
+  // If date or duration changed, reset status for re-approval
+  var dateChanged=date!==b.demo_start_date||parseFloat(dur)!==parseFloat(b.duration_days);
+  if(dateChanged&&currentProfile.role!=='admin'){
+    upd.status='Requested';
+  }
+
+  var{error}=await sb.from('bookings').update(upd).eq('id',id);
+  if(error){
+    alertEl.className='alert alert-err';alertEl.textContent='Error: '+error.message;alertEl.style.display='block';return;
+  }
+
+  // Notify admins if dates changed and re-approval needed
+  if(dateChanged&&currentProfile.role!=='admin'){
+    sendNotif({type:'new_request',to:notificationEmails,rep_name:b.rep_name,rep_email:b.rep_email,account:acct,location:loc,demo_start_date:date,duration_days:parseFloat(dur),demo_types:chips,notes:'[UPDATED BOOKING] '+notes});
+  }
+
+  await loadBookings();
 }
 
 // ── ADMIN ─────────────────────────────────────────────
@@ -1106,19 +1187,23 @@ function adminRow(b,isPending){
   var coordNotes='<div style="margin-top:8px;"><textarea class="notes-input" id="n-'+b.id+'" rows="2" placeholder="Coordinator notes..." onblur="saveCoordNotes(\''+b.id+'\')">'+(b.coordinator_notes||'')+'</textarea></div>';
   // Pending actions
   var actions=isPending?'<div class="brow-actions" style="margin-top:6px;"><button type="button" class="btn btn-sm btn-approve" onclick="setStatus(\''+b.id+'\',\'Confirmed\')">Confirm</button><button type="button" class="btn btn-sm btn-reject" onclick="setStatus(\''+b.id+'\',\'Pending\')">Hold</button><button type="button" class="btn btn-sm btn-ghost" onclick="setStatus(\''+b.id+'\',\'Cancelled\')">Cancel</button></div>':'';
-  // Upload button
-  var uploadBtn='<label style="cursor:pointer;display:inline-flex;align-items:center;gap:4px;margin-top:6px;"><input type="file" multiple accept="*/*" style="display:none;" onchange="uploadLater(\''+b.id+'\',this)"><span style="padding:3px 10px;background:#F3F4F6;border:1px solid var(--border);border-radius:6px;font-size:11px;font-weight:600;color:#374151;">📎 Add files</span></label>';
+  // Upload + edit buttons
+  var btnsRow='<div style="display:flex;gap:6px;align-items:center;margin-top:6px;">'
+    +'<button type="button" class="btn btn-sm btn-ghost" onclick="toggleEditForm(\''+b.id+'\')">Edit</button>'
+    +'<label style="cursor:pointer;display:inline-flex;align-items:center;gap:4px;"><input type="file" multiple accept="*/*" style="display:none;" onchange="uploadLater(\''+b.id+'\',this)"><span style="padding:3px 10px;background:#F3F4F6;border:1px solid var(--border);border-radius:6px;font-size:11px;font-weight:600;color:#374151;">📎 Add files</span></label>'
+    +'</div>';
 
   return '<div class="brow" style="flex-direction:column;align-items:stretch;">'
     +'<div style="display:flex;align-items:flex-start;gap:12px;">'
     +'<div class="brow-main"><div class="brow-acct">'+b.account+'</div>'
     +'<div class="brow-meta">'+b.location+' · '+fmtDate(b.demo_start_date)+' · '+dur+' · '+b.rep_name+' ('+b.rep_email+')</div>'
     +'<div style="margin-top:4px;">'+chips+'</div>'
-    +contact+notes+filesHtml+uploadBtn
+    +contact+notes+filesHtml+btnsRow
     +'</div>'
     +'<div style="text-align:right;">'+statusSelect+'</div>'
     +'</div>'
     +coordNotes+actions
+    +'<div id="edit-'+b.id+'" style="display:none;"></div>'
     +'</div>';
 }
 

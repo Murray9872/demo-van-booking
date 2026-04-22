@@ -520,6 +520,11 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--text);min
         <button type="button" class="btn btn-primary" style="max-width:200px;" onclick="saveSettings()">Save settings</button>
       </div>
       <div class="card">
+        <p class="sec-title">Admin access</p>
+        <div id="admin-users-list" style="margin-bottom:12px;"></div>
+        <div style="font-size:12px;color:var(--muted);margin-top:8px;">Toggle admin access for any registered user. Admins can approve/deny bookings, edit any booking, delete bookings, and access Settings.</div>
+      </div>
+      <div class="card">
         <p class="sec-title">Email service setup</p>
         <div style="font-size:13px;color:var(--muted);line-height:1.7;">
           <p>Emails are sent via <strong>Resend</strong> (free tier — 100 emails/day).</p>
@@ -725,6 +730,7 @@ function showTab(id){
   if(id==='mine')renderMine();
   if(id==='admin')renderAdmin();
   if(id==='reports')renderReports();
+  if(id==='settings')loadAdminUsers();
 }
 
 // ── LOAD ──────────────────────────────────────────────
@@ -1070,6 +1076,32 @@ async function saveSettings(){
   var{error}=await sb.from('settings').update({notification_emails:emails,travel_buffer_miles:miles,updated_at:new Date().toISOString()}).eq('id',1);
   if(error){showSettingsAlert('Error: '+error.message,false);}
   else{notificationEmails=emails;travelBufferMiles=miles;showSettingsAlert('Settings saved!',true);}
+}
+
+async function loadAdminUsers(){
+  try{
+    var{data}=await sb.from('profiles').select('id,email,full_name,role').order('full_name');
+    var el=document.getElementById('admin-users-list');
+    if(!data||!data.length){el.innerHTML='<div class="empty">No users found.</div>';return;}
+    el.innerHTML=data.map(function(u){
+      var isAdmin=u.role==='admin';
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #F3F4F6;">'
+        +'<div><strong style="font-size:13px;">'+u.full_name+'</strong><span style="font-size:12px;color:var(--muted);margin-left:8px;">'+u.email+'</span></div>'
+        +'<button type="button" class="btn btn-sm" style="'+(isAdmin?'background:var(--red);color:#fff;border:1px solid var(--red);':'background:#F3F4F6;color:#374151;border:1px solid var(--border);')+'" onclick="toggleAdmin(\''+u.id+'\',\''+esc(u.email)+'\','+(isAdmin?'false':'true')+')">'+(isAdmin?'Admin':'Make admin')+'</button>'
+        +'</div>';
+    }).join('');
+  }catch(e){console.log('Load users failed:',e);}
+}
+
+async function toggleAdmin(uid,email,makeAdmin){
+  var newRole=makeAdmin?'admin':'user';
+  if(!makeAdmin&&!confirm('Remove admin access for '+email+'?'))return;
+  var{error}=await sb.from('profiles').update({role:newRole}).eq('id',uid);
+  if(error){alert('Error: '+error.message);return;}
+  // Also update ADMIN_EMAILS array
+  if(makeAdmin&&!ADMIN_EMAILS.includes(email))ADMIN_EMAILS.push(email);
+  if(!makeAdmin){ADMIN_EMAILS=ADMIN_EMAILS.filter(function(e){return e!==email;});}
+  loadAdminUsers();
 }
 
 function showSettingsAlert(msg,ok){

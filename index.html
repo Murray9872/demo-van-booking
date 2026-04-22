@@ -884,7 +884,7 @@ function buildDP(){
     var ds=dpY+'-'+String(dpM+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
     var entry=bm[ds];
     var status=entry?entry.status:null;
-    var stLabel=entry&&entry.state?'<span style="font-size:8px;display:block;opacity:0.8;line-height:1;">'+entry.state+'</span>':'';
+    var stLabel=entry&&entry.state?'<span style="font-size:7px;display:block;opacity:0.6;line-height:1;font-style:italic;margin-top:1px;">'+entry.state+'</span>':'';
     var past=ds<minDate;
     var sel=ds===selectedDate;
     var isToday=ds===today;
@@ -1098,7 +1098,7 @@ function renderCal(){
     if(status==='Confirmed')cls+=' confirmed';else if(status==='Pending')cls+=' pending';else if(status==='Requested')cls+=' booked';else if(status==='travel')cls+=' travel';
     var extra='';
     if(status==='travel')extra='<span class="cal-travel-lbl">Travel</span>';
-    else if(entry&&entry.state)extra='<span style="font-size:8px;font-weight:700;opacity:0.7;">'+entry.state+'</span>';
+    else if(entry&&entry.state)extra='<span style="font-size:7px;opacity:0.55;font-style:italic;margin-top:1px;">'+entry.state+'</span>';
     html+='<div class="'+cls+'"><span class="cal-day-num">'+d+'</span>'+extra+'</div>';
   }
   var rem=(7-(first.getDay()+last.getDate())%7)%7;for(var i=1;i<=rem;i++)html+='<div class="cal-day other-month"><span class="cal-day-num">'+i+'</span></div>';

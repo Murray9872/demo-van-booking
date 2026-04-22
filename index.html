@@ -723,6 +723,7 @@ function showTab(id){
 async function loadBookings(){
   var{data}=await sb.from('bookings').select('*').order('demo_start_date',{ascending:true});
   allBookings=data||[];
+  await geocodeAllBookings();
   updateVanStatus();
   updateBadge();
   buildDP();
@@ -754,15 +755,72 @@ function updateVanStatus(){
   else{loc.textContent='Detroit, MI';sub.textContent='No upcoming bookings';badge.textContent='Available';badge.className='badge badge-ok';dot.className='van-dot';}
 }
 
-// ── BOOKED MAP ────────────────────────────────────────
-function bookedMap(){
+// ── HELPERS: DISTANCE & STATE ─────────────────────────
+function getState(loc){
+  if(!loc)return'';
+  var parts=loc.split(',');if(parts.length<2)return'';
+  var s=parts[parts.length-1].trim().replace(/\d/g,'').trim();
+  return s.length<=3?s.toUpperCase():s.substring(0,2).toUpperCase();
+}
+
+function haversine(lat1,lng1,lat2,lng2){
+  var R=3959,dLat=(lat2-lat1)*Math.PI/180,dLng=(lng2-lng1)*Math.PI/180;
+  var a=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)*Math.sin(dLng/2);
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+function locDist(loc1,loc2){
+  var c1=geocodeCache[loc1],c2=geocodeCache[loc2];
+  if(!c1||!c2)return 9999; // assume far if not geocoded
+  return haversine(c1.lat,c1.lng,c2.lat,c2.lng);
+}
+
+async function geocodeAllBookings(){
+  var locs=new Set();
+  allBookings.forEach(function(b){if(b.location)locs.add(b.location);});
+  for(var loc of locs){if(!geocodeCache[loc])await geocode(loc);}
+}
+
+// ── BOOKED MAP (smart travel buffer + state labels) ───
+// userLoc: optional user location for date picker context
+function bookedMap(userLoc){
   var m={};
-  allBookings.filter(function(b){return b.status!=='Cancelled';}).forEach(function(b){
+  var active=allBookings.filter(function(b){return b.status!=='Cancelled';})
+    .sort(function(a,b){return a.demo_start_date.localeCompare(b.demo_start_date);});
+
+  for(var i=0;i<active.length;i++){
+    var b=active[i];
     var dur=parseFloat(b.duration_days||1);
-    var before=addDays(b.demo_start_date,-1);if(!m[before])m[before]='travel';
-    for(var i=0;i<dur;i++){var d=addDays(b.demo_start_date,i);if(!m[d]||b.status==='Confirmed')m[d]=b.status;}
-    var after=addDays(b.demo_start_date,dur);if(!m[after])m[after]='travel';
-  });
+    var st=getState(b.location);
+
+    // Booking days — include state abbreviation
+    for(var j=0;j<dur;j++){
+      var d=addDays(b.demo_start_date,j);
+      if(!m[d]||b.status==='Confirmed') m[d]={status:b.status,state:st,loc:b.location};
+    }
+
+    // Travel BEFORE: skip if previous booking is <100mi away
+    var beforeDate=addDays(b.demo_start_date,-1);
+    var needBefore=true;
+    if(i>0){
+      var prev=active[i-1];
+      var prevEnd=addDays(prev.demo_start_date,parseFloat(prev.duration_days||1)-1);
+      // Only relevant if prev booking is adjacent (ends day before travel day or later)
+      if(locDist(b.location,prev.location)<100) needBefore=false;
+    }
+    if(userLoc&&locDist(b.location,userLoc)<100) needBefore=false;
+    if(needBefore&&!m[beforeDate]) m[beforeDate]={status:'travel',state:'',loc:''};
+
+    // Travel AFTER: skip if next booking is <100mi away
+    var afterDate=addDays(b.demo_start_date,dur);
+    var needAfter=true;
+    if(i<active.length-1){
+      var next=active[i+1];
+      if(locDist(b.location,next.location)<100) needAfter=false;
+    }
+    if(userLoc&&locDist(b.location,userLoc)<100) needAfter=false;
+    if(needAfter&&!m[afterDate]) m[afterDate]={status:'travel',state:'',loc:''};
+  }
   return m;
 }
 
@@ -783,7 +841,12 @@ function checkBorder(){
 
 // ── CUSTOM DATE PICKER ────────────────────────────────
 function toggleDP(){dpOpen?closeDP():openDP();}
-function openDP(){
+async function openDP(){
+  var loc=document.getElementById('f-loc').value.trim();
+  if(!loc){showAuthAlert&&0;document.getElementById('conflict-alert').innerHTML='Please enter a demo location before selecting dates.';document.getElementById('conflict-alert').style.display='block';return;}
+  document.getElementById('conflict-alert').style.display='none';
+  // Geocode user location if not cached
+  if(!geocodeCache[loc])await geocode(loc);
   if(selectedDate){var d=new Date(selectedDate+'T00:00:00');dpY=d.getFullYear();dpM=d.getMonth();}
   else{dpY=new Date().getFullYear();dpM=new Date().getMonth();}
   buildDP();
@@ -802,7 +865,8 @@ function buildDP(){
   var months=['January','February','March','April','May','June','July','August','September','October','November','December'];
   var mEl=document.getElementById('dp-month');if(mEl)mEl.textContent=months[dpM]+' '+dpY;
   var gEl=document.getElementById('dp-grid');if(!gEl)return;
-  var bm=bookedMap();
+  var userLoc=document.getElementById('f-loc')?document.getElementById('f-loc').value.trim():'';
+  var bm=bookedMap(userLoc);
   var today=new Date().toISOString().split('T')[0];
   var minDate=addDays(today,7);
   var first=new Date(dpY,dpM,1),last=new Date(dpY,dpM+1,0);
@@ -810,20 +874,22 @@ function buildDP(){
   for(var i=0;i<first.getDay();i++)html+='<div class="dp-cell other"></div>';
   for(var d=1;d<=last.getDate();d++){
     var ds=dpY+'-'+String(dpM+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
-    var st=bm[ds];
+    var entry=bm[ds];
+    var status=entry?entry.status:null;
+    var stLabel=entry&&entry.state?'<span style="font-size:8px;display:block;opacity:0.8;line-height:1;">'+entry.state+'</span>':'';
     var past=ds<minDate;
     var sel=ds===selectedDate;
     var isToday=ds===today;
     var cls='dp-cell';
     if(sel)cls+=' selected';
     else if(past)cls+=' disabled';
-    else if(st==='Confirmed')cls+=' conf';
-    else if(st==='Pending')cls+=' pend';
-    else if(st==='Requested')cls+=' req';
-    else if(st==='travel')cls+=' trav';
+    else if(status==='Confirmed')cls+=' conf';
+    else if(status==='Pending')cls+=' pend';
+    else if(status==='Requested')cls+=' req';
+    else if(status==='travel')cls+=' trav';
     else{cls+=' avail';if(isToday)cls+=' istoday';}
-    var click=(!past&&!st)||sel?'onclick="pickDate(\''+ds+'\')"':'';
-    html+='<div class="'+cls+'" '+click+'>'+d+'</div>';
+    var click=(!past&&!status)||sel?'onclick="pickDate(\''+ds+'\')"':'';
+    html+='<div class="'+cls+'" '+click+'>'+d+stLabel+'</div>';
   }
   var rem=(7-(first.getDay()+last.getDate())%7)%7;
   for(var i=1;i<=rem;i++)html+='<div class="dp-cell other"></div>';
@@ -840,6 +906,7 @@ function pickDate(ds){
 // ── CONFLICT ──────────────────────────────────────────
 function checkConflict(){
   var dur=document.getElementById('f-dur').value;
+  var userLoc=document.getElementById('f-loc').value.trim();
   var alertEl=document.getElementById('conflict-alert');
   var btn=document.getElementById('btn-submit');
   if(!selectedDate||!dur){alertEl.style.display='none';hasConflict=false;btn.disabled=false;return;}
@@ -849,13 +916,19 @@ function checkConflict(){
   for(var i=0;i<allBookings.length;i++){
     var b=allBookings[i];if(b.status==='Cancelled')continue;
     var bd=parseFloat(b.duration_days||1);
-    var bs=addDays(b.demo_start_date,-1),be=addDays(b.demo_start_date,bd);
+    // Determine travel buffer based on distance
+    var nearby=userLoc&&locDist(userLoc,b.location)<100;
+    var bufferBefore=nearby?0:1;
+    var bufferAfter=nearby?0:1;
+    var bs=addDays(b.demo_start_date,-bufferBefore);
+    var be=addDays(b.demo_start_date,bd-1+bufferAfter);
     if(ns<=be&&ne>=bs){conflict=b;break;}
   }
   if(conflict){
     hasConflict=true;
     var ce=addDays(conflict.demo_start_date,Math.max(parseFloat(conflict.duration_days||1)-1,0));
-    alertEl.innerHTML='Van unavailable — conflicts with <strong>'+conflict.account+'</strong> on '+fmtDate(conflict.demo_start_date)+(ce!==conflict.demo_start_date?' – '+fmtDate(ce):'')+' (includes travel buffer)';
+    var nearby2=userLoc&&locDist(userLoc,conflict.location)<100;
+    alertEl.innerHTML='Van unavailable — conflicts with <strong>'+conflict.account+'</strong> on '+fmtDate(conflict.demo_start_date)+(ce!==conflict.demo_start_date?' – '+fmtDate(ce):'')+(nearby2?'':' (includes travel buffer)');
     alertEl.style.display='block';btn.disabled=true;
   } else {
     hasConflict=false;alertEl.style.display='none';btn.disabled=false;
@@ -1006,10 +1079,13 @@ function renderCal(){
   for(var d=1;d<=last.getDate();d++){
     var ds=calY+'-'+String(calM+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
     var cls='cal-day';if(ds===today)cls+=' today';
-    var st=bm[ds];
-    if(st==='Confirmed')cls+=' confirmed';else if(st==='Pending')cls+=' pending';else if(st==='Requested')cls+=' booked';else if(st==='travel')cls+=' travel';
-    var tl=st==='travel'?'<span class="cal-travel-lbl">Travel</span>':'';
-    html+='<div class="'+cls+'"><span class="cal-day-num">'+d+'</span>'+tl+'</div>';
+    var entry=bm[ds];
+    var status=entry?entry.status:null;
+    if(status==='Confirmed')cls+=' confirmed';else if(status==='Pending')cls+=' pending';else if(status==='Requested')cls+=' booked';else if(status==='travel')cls+=' travel';
+    var extra='';
+    if(status==='travel')extra='<span class="cal-travel-lbl">Travel</span>';
+    else if(entry&&entry.state)extra='<span style="font-size:8px;font-weight:700;opacity:0.7;">'+entry.state+'</span>';
+    html+='<div class="'+cls+'"><span class="cal-day-num">'+d+'</span>'+extra+'</div>';
   }
   var rem=(7-(first.getDay()+last.getDate())%7)%7;for(var i=1;i<=rem;i++)html+='<div class="cal-day other-month"><span class="cal-day-num">'+i+'</span></div>';
   document.getElementById('cal-grid').innerHTML=html;

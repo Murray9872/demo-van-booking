@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Request a Demo Van Visit — Apera AI</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+:root{--red:#E8192C;--red-dark:#C41020;--red-light:#FEE8EA;--dark:#1A1A1A;--border:#E5E7EB;--text:#1A1A1A;--muted:#6B7280;--rsm:7px;--radius:10px;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',sans-serif;background:#F9FAFB;color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased;}
+
+.header{background:var(--dark);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;}
+.header-logo{font-size:16px;font-weight:800;color:var(--red);letter-spacing:0.15em;}
+.header-title{color:rgba(255,255,255,0.6);font-size:13px;margin-left:12px;}
+.header a{color:rgba(255,255,255,0.5);font-size:12px;text-decoration:none;}
+.header a:hover{color:#fff;}
+
+.hero{background:var(--dark);padding:40px 24px 60px;text-align:center;color:#fff;}
+.hero h1{font-size:28px;font-weight:800;margin-bottom:8px;}
+.hero p{font-size:15px;color:rgba(255,255,255,0.6);max-width:520px;margin:0 auto;}
+
+.container{max-width:720px;margin:-30px auto 60px;padding:0 16px;}
+.card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:28px;margin-bottom:16px;box-shadow:0 2px 12px rgba(0,0,0,0.04);}
+.sec-title{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.12em;color:var(--red);margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border);}
+
+.fg{margin-bottom:16px;}
+.fg label{display:block;font-size:11px;font-weight:700;color:#374151;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.07em;}
+.fg label .req{color:var(--red);}
+.fg input,.fg select,.fg textarea{width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--rsm);font-size:14px;font-family:'Inter',sans-serif;color:var(--text);background:#FAFBFC;outline:none;transition:border-color 0.15s;}
+.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--red);background:#fff;}
+.fg input::placeholder,.fg textarea::placeholder{color:#9CA3AF;}
+.fg select{-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:38px;}
+.fg textarea{min-height:80px;resize:vertical;line-height:1.5;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.form-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;}
+@media(max-width:600px){.form-row,.form-row-3{grid-template-columns:1fr;}}
+.divider{height:1px;background:var(--border);margin:20px 0;}
+
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;padding:4px;border:2px solid transparent;border-radius:var(--rsm);}
+.chips.error{border-color:var(--red);}
+.chip{display:inline-block;padding:6px 13px;border:1.5px solid var(--border);border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;color:#4B5563;background:#F9FAFB;user-select:none;}
+.chip.on{background:var(--red-light);color:var(--red-dark);border-color:var(--red);}
+
+.alert{padding:11px 15px;border-radius:var(--rsm);font-size:13px;margin-bottom:16px;border:1.5px solid;line-height:1.5;}
+.alert-err{background:#FEF2F2;color:#991B1B;border-color:#FECACA;}
+.alert-ok{background:#ECFDF5;color:#065F46;border-color:#A7F3D0;}
+
+.btn-primary{background:var(--red);color:#fff;width:100%;padding:13px;font-size:15px;font-weight:700;border-radius:8px;border:none;cursor:pointer;font-family:'Inter',sans-serif;}
+.btn-primary:hover{background:var(--red-dark);}
+.btn-primary:disabled{background:#D1D5DB;cursor:not-allowed;}
+
+.border-warning{background:#FEF3C7;border:1.5px solid #FCD34D;border-radius:var(--rsm);padding:11px 15px;font-size:13px;color:#92400E;margin-top:8px;display:none;line-height:1.5;}
+
+/* CALENDAR */
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
+.cal-hdr{text-align:center;font-size:10px;font-weight:700;color:var(--muted);padding:6px 0;text-transform:uppercase;}
+.cal-day{min-height:38px;border-radius:6px;border:1.5px solid transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:12px;font-weight:600;}
+.cal-day.other{color:#D1D5DB;}
+.cal-day.today{border-color:var(--red);color:var(--red);font-weight:800;}
+.cal-day.conf{background:#D1FAE5;border-color:#6EE7B7;color:#065F46;}
+.cal-day.pend{background:#FEF3C7;border-color:#FCD34D;color:#92400E;}
+.cal-day.req{background:#FEE2E2;border-color:#FCA5A5;color:#991B1B;}
+.cal-day.travel{background:#F3F4F6;border-color:#E5E7EB;color:#9CA3AF;}
+.cal-state{font-size:7px;opacity:0.6;font-style:italic;margin-top:1px;}
+.cal-nav-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.cal-nav-btn{background:none;border:1.5px solid var(--border);border-radius:6px;padding:5px 12px;cursor:pointer;font-size:13px;font-family:'Inter',sans-serif;}
+.cal-month{font-size:15px;font-weight:700;}
+.cal-legend{display:flex;gap:14px;margin-top:12px;flex-wrap:wrap;}
+.cal-legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);}
+.cal-legend-dot{width:10px;height:10px;border-radius:3px;}
+
+/* DATE PICKER */
+.dp-wrap{position:relative;}
+.dp-display{width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--rsm);font-size:14px;cursor:pointer;background:#FAFBFC;color:#9CA3AF;display:flex;align-items:center;justify-content:space-between;user-select:none;}
+.dp-display.filled{color:var(--text);}
+.dp-display.open{border-color:var(--red);background:#fff;}
+.dp-popup{position:absolute;top:calc(100% + 4px);left:0;background:#fff;border:1.5px solid var(--border);border-radius:var(--radius);padding:16px;z-index:500;box-shadow:0 8px 32px rgba(0,0,0,0.12);min-width:300px;display:none;}
+.dp-popup.open{display:block;}
+.dp-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.dp-nav button{background:none;border:1.5px solid var(--border);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:13px;font-family:'Inter',sans-serif;}
+.dp-month{font-size:14px;font-weight:700;}
+.dp-days{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:3px;}
+.dp-dh{text-align:center;font-size:10px;font-weight:700;color:var(--muted);padding:3px 0;}
+.dp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
+.dp-c{min-height:33px;display:flex;align-items:center;justify-content:center;border-radius:5px;font-size:12px;font-weight:600;border:1.5px solid transparent;cursor:default;flex-direction:column;}
+.dp-c.other{color:#E5E7EB;}.dp-c.disabled{color:#D1D5DB;}
+.dp-c.avail{cursor:pointer;color:var(--text);}.dp-c.avail:hover{background:var(--red-light);border-color:var(--red);color:var(--red-dark);}
+.dp-c.selected{background:var(--red)!important;color:#fff!important;border-color:var(--red)!important;}
+.dp-c.conf{background:#D1FAE5;color:#065F46;border-color:#6EE7B7;cursor:not-allowed;}
+.dp-c.pend{background:#FEF3C7;color:#92400E;border-color:#FCD34D;cursor:not-allowed;}
+.dp-c.req{background:#FEE2E2;color:#991B1B;border-color:#FCA5A5;cursor:not-allowed;}
+.dp-c.trav{background:#F3F4F6;color:#9CA3AF;border-color:#E5E7EB;cursor:not-allowed;}
+.dp-c.istoday.avail{color:var(--red);border-color:var(--red);}
+.dp-legend{display:flex;gap:10px;flex-wrap:wrap;padding-top:10px;border-top:1px solid var(--border);margin-top:8px;}
+.dp-li{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--muted);}
+.dp-li-dot{width:8px;height:8px;border-radius:2px;}
+
+.success-view{text-align:center;padding:60px 24px;}
+.success-icon{font-size:48px;margin-bottom:16px;}
+.success-title{font-size:22px;font-weight:700;margin-bottom:8px;}
+.success-sub{font-size:14px;color:var(--muted);max-width:400px;margin:0 auto;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div style="display:flex;align-items:center;">
+    <span class="header-logo">APERA</span>
+    <span class="header-title">Demo Van</span>
+  </div>
+  <a href="/">Team login</a>
+</div>
+
+<div class="hero">
+  <h1>See Apera AI in action</h1>
+  <p>Request our demo van to visit your plant. We bring the robots, vision system, and parts handling demos to you.</p>
+</div>
+
+<div class="container">
+  <!-- AVAILABILITY CALENDAR -->
+  <div class="card">
+    <p class="sec-title">Van availability</p>
+    <div class="cal-nav-row">
+      <button class="cal-nav-btn" onclick="calShift(-1)">&#8592;</button>
+      <span class="cal-month" id="cal-month"></span>
+      <button class="cal-nav-btn" onclick="calShift(1)">&#8594;</button>
+    </div>
+    <div class="cal-grid" id="cal-grid"></div>
+    <div class="cal-legend" style="margin-top:12px;">
+      <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#D1FAE5;border:1px solid #6EE7B7;"></div>Booked</div>
+      <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#FEF3C7;border:1px solid #FCD34D;"></div>Tentative</div>
+      <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#F3F4F6;border:1px solid #E5E7EB;"></div>Travel</div>
+    </div>
+  </div>
+
+  <!-- REQUEST FORM -->
+  <div class="card" id="form-card">
+    <p class="sec-title">Request a visit</p>
+    <div id="form-alert" style="display:none;"></div>
+    <div class="fg"><label>Company name <span class="req">*</span></label><input type="text" id="f-company" placeholder="e.g. Ford Motor Company"></div>
+    <div class="form-row">
+      <div class="fg">
+        <label>Plant location <span class="req">*</span></label>
+        <input type="text" id="f-loc" placeholder="City, State" oninput="checkBorder()">
+        <div class="border-warning" id="border-warning">&#127464;&#127462; Cross-border trip — additional lead time may be required for border documentation.</div>
+      </div>
+      <div class="fg">
+        <label>Preferred date <span class="req">*</span></label>
+        <div class="dp-wrap" id="dp-wrap">
+          <div class="dp-display" id="dp-display" onclick="toggleDP()">
+            <span id="dp-text">Select a date...</span>
+            <span style="color:var(--muted);font-size:11px;">&#9660;</span>
+          </div>
+          <div class="dp-popup" id="dp-popup">
+            <div class="dp-nav">
+              <button onclick="dpShift(-1,event)">&#8592;</button>
+              <span class="dp-month" id="dp-month"></span>
+              <button onclick="dpShift(1,event)">&#8594;</button>
+            </div>
+            <div class="dp-days">
+              <div class="dp-dh">Su</div><div class="dp-dh">Mo</div><div class="dp-dh">Tu</div>
+              <div class="dp-dh">We</div><div class="dp-dh">Th</div><div class="dp-dh">Fr</div><div class="dp-dh">Sa</div>
+            </div>
+            <div class="dp-grid" id="dp-grid"></div>
+            <div class="dp-legend">
+              <div class="dp-li"><div class="dp-li-dot" style="background:#D1FAE5;border:1px solid #6EE7B7;"></div>Booked</div>
+              <div class="dp-li"><div class="dp-li-dot" style="background:#FEF3C7;border:1px solid #FCD34D;"></div>Tentative</div>
+              <div class="dp-li"><div class="dp-li-dot" style="background:#F3F4F6;border:1px solid #E5E7EB;"></div>Travel</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="fg">
+      <label>Duration <span class="req">*</span></label>
+      <select id="f-dur">
+        <option value="">Select...</option>
+        <option value="0.5">Half day</option>
+        <option value="1">1 day</option>
+        <option value="2">2 days</option>
+        <option value="3">3 days</option>
+        <option value="4">4 days</option>
+        <option value="5">5 days</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label>What are you interested in? <span class="req">*</span></label>
+      <div class="chips" id="chips-wrap">
+        <span class="chip" onclick="this.classList.toggle('on')">Bin picking</span>
+        <span class="chip" onclick="this.classList.toggle('on')">Dunnage picking</span>
+        <span class="chip" onclick="this.classList.toggle('on')">De-racking</span>
+        <span class="chip" onclick="this.classList.toggle('on')">Machine tending</span>
+        <span class="chip" onclick="this.classList.toggle('on')">Assembly</span>
+        <span class="chip" onclick="this.classList.toggle('on')">Sorting</span>
+        <span class="chip" id="chip-other" onclick="this.classList.toggle('on');document.getElementById('f-other').style.display=this.classList.contains('on')?'block':'none';">Other</span>
+      </div>
+      <input type="text" id="f-other" placeholder="Describe..." style="display:none;margin-top:8px;width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--rsm);font-size:14px;font-family:'Inter',sans-serif;outline:none;">
+    </div>
+    <div class="divider"></div>
+    <p class="sec-title">Your contact info</p>
+    <div class="form-row">
+      <div class="fg"><label>Your name <span class="req">*</span></label><input type="text" id="f-name" placeholder="Jane Smith"></div>
+      <div class="fg"><label>Email <span class="req">*</span></label><input type="email" id="f-email" placeholder="jane@company.com"></div>
+    </div>
+    <div class="fg"><label>Phone</label><input type="tel" id="f-phone" placeholder="(555) 555-5555"></div>
+    <div class="fg"><label>Additional notes</label><textarea id="f-notes" placeholder="Part types, plant access requirements, anything we should know..."></textarea></div>
+    <button type="button" class="btn-primary" id="btn-submit" onclick="submitRequest()">Submit Request</button>
+    <div style="font-size:11px;color:var(--muted);margin-top:12px;text-align:center;">Our team will review your request and get back to you within 1-2 business days.</div>
+  </div>
+
+  <!-- SUCCESS VIEW (hidden until submit) -->
+  <div class="card" id="success-card" style="display:none;">
+    <div class="success-view">
+      <div class="success-icon">&#10003;</div>
+      <div class="success-title">Request submitted!</div>
+      <div class="success-sub">We've received your demo van request. You'll receive email updates as your booking is reviewed and confirmed.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+var SURL='https://gtcinsveqrwqakxentfo.supabase.co';
+var SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd0Y2luc3ZlcXJ3cWFreGVudGZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwOTQzMzksImV4cCI6MjA5MTY3MDMzOX0.BsCaAnqO0x7PsKoAnv776hQWAYx4Qihpp2znesLjBfU';
+var sb=supabase.createClient(SURL,SKEY);
+
+var calData=[],travelMiles=100;
+var calY=new Date().getFullYear(),calM=new Date().getMonth();
+var dpY=new Date().getFullYear(),dpM=new Date().getMonth(),dpOpen=false,selectedDate=null;
+var geocodeCache={};
+
+// ── LOAD CALENDAR DATA ───────────────────────────────
+async function loadCalendar(){
+  try{
+    var r=await fetch('/api/public-calendar');
+    var d=await r.json();
+    calData=d.bookings||[];
+    travelMiles=d.travelBufferMiles||100;
+  }catch(e){
+    // Fallback: try direct Supabase query with limited fields
+    try{
+      var{data}=await sb.from('bookings').select('demo_start_date,duration_days,location,status').neq('status','Cancelled').order('demo_start_date',{ascending:true});
+      calData=(data||[]).map(function(b){
+        var parts=(b.location||'').split(',');
+        var s=parts.length>=2?parts[parts.length-1].trim().replace(/\d/g,'').trim():'';
+        return{date:b.demo_start_date,duration:parseFloat(b.duration_days||1),state:s.length<=3?s.toUpperCase():s.substring(0,2).toUpperCase(),status:b.status};
+      });
+    }catch(e2){}
+  }
+  renderCal();
+}
+
+// ── BOOKED MAP ───────────────────────────────────────
+function bookedMap(){
+  var m={};
+  var sorted=calData.slice().sort(function(a,b){return a.date.localeCompare(b.date);});
+  sorted.forEach(function(b,i){
+    for(var j=0;j<b.duration;j++){
+      var d=addDays(b.date,j);
+      if(!m[d]||b.status==='Confirmed')m[d]={status:b.status,state:b.state};
+    }
+    // Travel before
+    var before=addDays(b.date,-1);
+    if(!m[before])m[before]={status:'travel',state:''};
+    // Travel after
+    var after=addDays(b.date,b.duration);
+    if(!m[after])m[after]={status:'travel',state:''};
+  });
+  return m;
+}
+
+// ── CALENDAR ─────────────────────────────────────────
+function calShift(dir){calM+=dir;if(calM<0){calM=11;calY--;}if(calM>11){calM=0;calY++;}renderCal();}
+
+function renderCal(){
+  var months=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('cal-month').textContent=months[calM]+' '+calY;
+  var bm=bookedMap();
+  var first=new Date(calY,calM,1),last=new Date(calY,calM+1,0);
+  var today=new Date().toISOString().split('T')[0];
+  var days=['Su','Mo','Tu','We','Th','Fr','Sa'];
+  var html=days.map(function(d){return '<div class="cal-hdr">'+d+'</div>';}).join('');
+  for(var i=0;i<first.getDay();i++)html+='<div class="cal-day other"></div>';
+  for(var d=1;d<=last.getDate();d++){
+    var ds=calY+'-'+String(calM+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    var entry=bm[ds];var status=entry?entry.status:null;
+    var cls='cal-day';if(ds===today)cls+=' today';
+    if(status==='Confirmed')cls+=' conf';else if(status==='Pending'||status==='Requested')cls+=' pend';else if(status==='travel')cls+=' travel';
+    var extra='';
+    if(status==='travel')extra='';
+    else if(entry&&entry.state)extra='<span class="cal-state">'+entry.state+'</span>';
+    html+='<div class="'+cls+'">'+d+extra+'</div>';
+  }
+  var rem=(7-(first.getDay()+last.getDate())%7)%7;
+  for(var i=1;i<=rem;i++)html+='<div class="cal-day other"></div>';
+  document.getElementById('cal-grid').innerHTML=html;
+}
+
+// ── DATE PICKER ──────────────────────────────────────
+function toggleDP(){dpOpen?closeDP():openDP();}
+function openDP(){
+  var loc=document.getElementById('f-loc').value.trim();
+  if(!loc){document.getElementById('f-loc').style.borderColor='var(--red)';return;}
+  if(selectedDate){var d=new Date(selectedDate+'T00:00:00');dpY=d.getFullYear();dpM=d.getMonth();}
+  else{dpY=new Date().getFullYear();dpM=new Date().getMonth();}
+  buildDP();
+  document.getElementById('dp-popup').classList.add('open');
+  document.getElementById('dp-display').classList.add('open');
+  dpOpen=true;
+}
+function closeDP(){document.getElementById('dp-popup').classList.remove('open');document.getElementById('dp-display').classList.remove('open');dpOpen=false;}
+function dpShift(dir,e){if(e)e.stopPropagation();dpM+=dir;if(dpM<0){dpM=11;dpY--;}if(dpM>11){dpM=0;dpY++;}buildDP();}
+
+function buildDP(){
+  var months=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('dp-month').textContent=months[dpM]+' '+dpY;
+  var bm=bookedMap();
+  var today=new Date().toISOString().split('T')[0];
+  var minDate=addDays(today,14); // 2-week lead time for external requests
+  var first=new Date(dpY,dpM,1),last=new Date(dpY,dpM+1,0);
+  var html='';
+  for(var i=0;i<first.getDay();i++)html+='<div class="dp-c other"></div>';
+  for(var d=1;d<=last.getDate();d++){
+    var ds=dpY+'-'+String(dpM+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    var entry=bm[ds];var status=entry?entry.status:null;
+    var stLabel=entry&&entry.state?'<span style="font-size:7px;opacity:0.6;font-style:italic;">'+entry.state+'</span>':'';
+    var past=ds<minDate;var sel=ds===selectedDate;var isToday=ds===today;
+    var cls='dp-c';
+    if(sel)cls+=' selected';
+    else if(past)cls+=' disabled';
+    else if(status==='Confirmed')cls+=' conf';
+    else if(status==='Pending'||status==='Requested')cls+=' pend';
+    else if(status==='travel')cls+=' trav';
+    else{cls+=' avail';if(isToday)cls+=' istoday';}
+    var click=(!past&&!status)||sel?'onclick="pickDate(\''+ds+'\')"':'';
+    html+='<div class="'+cls+'" '+click+'>'+d+stLabel+'</div>';
+  }
+  var rem=(7-(first.getDay()+last.getDate())%7)%7;
+  for(var i=1;i<=rem;i++)html+='<div class="dp-c other"></div>';
+  document.getElementById('dp-grid').innerHTML=html;
+}
+
+function pickDate(ds){
+  selectedDate=ds;
+  document.getElementById('dp-text').textContent=fmtDate(ds);
+  document.getElementById('dp-display').classList.add('filled');
+  closeDP();
+}
+
+// ── BORDER CHECK ─────────────────────────────────────
+function checkBorder(){
+  var v=document.getElementById('f-loc').value;
+  document.getElementById('f-loc').style.borderColor='';
+  var r=/\b(ontario|canada|quebec|alberta|manitoba|saskatchewan|nova\s*scotia|new\s*brunswick|british\s*columbia)\b|\b(ON|BC|QC|AB|MB|SK|NS|NB)[,\s]/i;
+  document.getElementById('border-warning').style.display=r.test(v)?'block':'none';
+}
+
+// ── SUBMIT ───────────────────────────────────────────
+async function submitRequest(){
+  var company=document.getElementById('f-company').value.trim();
+  var loc=document.getElementById('f-loc').value.trim();
+  var dur=document.getElementById('f-dur').value;
+  var chips=Array.from(document.querySelectorAll('#chips-wrap .chip.on')).map(function(c){return c.textContent;}).filter(function(t){return t!=='Other';});
+  if(document.getElementById('chip-other').classList.contains('on')){
+    var ov=document.getElementById('f-other').value.trim();if(ov)chips.push(ov);
+  }
+  var name=document.getElementById('f-name').value.trim();
+  var email=document.getElementById('f-email').value.trim();
+  var phone=document.getElementById('f-phone').value.trim();
+  var notes=document.getElementById('f-notes').value.trim();
+  var alertEl=document.getElementById('form-alert');alertEl.style.display='none';
+
+  if(!company||!loc||!selectedDate||!dur||!name||!email){
+    alertEl.className='alert alert-err';alertEl.textContent='Please fill in all required fields.';alertEl.style.display='block';return;
+  }
+  if(!chips.length){
+    alertEl.className='alert alert-err';alertEl.textContent='Please select at least one demo type.';alertEl.style.display='block';
+    document.getElementById('chips-wrap').classList.add('error');return;
+  }
+
+  var btn=document.getElementById('btn-submit');btn.disabled=true;btn.textContent='Submitting...';
+
+  // Insert as a booking — rep fields store the customer's info
+  var{error}=await sb.from('bookings').insert({
+    rep_name:name,
+    rep_email:email,
+    account:company+'  [EXTERNAL REQUEST]',
+    location:loc,
+    demo_start_date:selectedDate,
+    duration_days:parseFloat(dur),
+    demo_types:chips,
+    notes:notes?(notes+'\n\n[Submitted via public booking form]'):'[Submitted via public booking form]',
+    contact_name:name,
+    contact_email:email,
+    contact_phone:phone||null,
+    status:'Requested'
+  });
+
+  if(error){
+    alertEl.className='alert alert-err';alertEl.textContent='Error submitting request. Please try again or contact us directly.';alertEl.style.display='block';
+    btn.disabled=false;btn.textContent='Submit Request';return;
+  }
+
+  // Send admin notification
+  try{
+    // Load notification emails from settings
+    var{data:settings}=await sb.from('settings').select('notification_emails').eq('id',1).maybeSingle();
+    var notifEmails=(settings&&settings.notification_emails)||[];
+    if(notifEmails.length){
+      await fetch('/api/notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+        type:'new_request',to:notifEmails,rep_name:name,rep_email:email,
+        account:company+' [EXTERNAL]',location:loc,demo_start_date:selectedDate,
+        duration_days:parseFloat(dur),demo_types:chips,notes:notes
+      })});
+    }
+  }catch(e){}
+
+  // Show success
+  document.getElementById('form-card').style.display='none';
+  document.getElementById('success-card').style.display='block';
+}
+
+// ── HELPERS ──────────────────────────────────────────
+function fmtDate(s){if(!s)return'';return new Date(s+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
+function addDays(s,n){var d=new Date(s+'T00:00:00');d.setDate(d.getDate()+Math.floor(parseFloat(n)));return d.toISOString().split('T')[0];}
+
+// Close date picker on outside click
+document.addEventListener('click',function(e){if(dpOpen&&!e.target.closest('#dp-wrap'))closeDP();});
+
+// Init
+loadCalendar();
+</script>
+</body>
+</html>

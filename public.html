@@ -233,21 +233,17 @@ var geocodeCache={};
 // ── LOAD CALENDAR DATA ───────────────────────────────
 async function loadCalendar(){
   try{
-    var r=await fetch('/api/public-calendar');
-    var d=await r.json();
-    calData=d.bookings||[];
-    travelMiles=d.travelBufferMiles||100;
-  }catch(e){
-    // Fallback: try direct Supabase query with limited fields
-    try{
-      var{data}=await sb.from('bookings').select('demo_start_date,duration_days,location,status').neq('status','Cancelled').order('demo_start_date',{ascending:true});
-      calData=(data||[]).map(function(b){
-        var parts=(b.location||'').split(',');
-        var s=parts.length>=2?parts[parts.length-1].trim().replace(/\d/g,'').trim():'';
-        return{date:b.demo_start_date,duration:parseFloat(b.duration_days||1),state:s.length<=3?s.toUpperCase():s.substring(0,2).toUpperCase(),status:b.status};
-      });
-    }catch(e2){}
-  }
+    // Query Supabase directly — anon RLS policy limits to non-cancelled bookings
+    var{data}=await sb.from('bookings').select('demo_start_date,duration_days,location,status').neq('status','Cancelled').order('demo_start_date',{ascending:true});
+    calData=(data||[]).map(function(b){
+      var parts=(b.location||'').split(',');
+      var s=parts.length>=2?parts[parts.length-1].trim().replace(/\d/g,'').trim():'';
+      return{date:b.demo_start_date,duration:parseFloat(b.duration_days||1),state:s.length<=3?s.toUpperCase():s.substring(0,2).toUpperCase(),status:b.status};
+    });
+    // Load travel buffer setting
+    var{data:settings}=await sb.from('settings').select('travel_buffer_miles').eq('id',1).maybeSingle();
+    if(settings&&settings.travel_buffer_miles)travelMiles=settings.travel_buffer_miles;
+  }catch(e){console.log('Calendar load error:',e);}
   renderCal();
 }
 

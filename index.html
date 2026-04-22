@@ -1172,7 +1172,7 @@ function toggleEditForm(id){
   el.style.display='block';
 }
 
-function esc(s){return String(s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
+function esc(s){return String(s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/'/g,'&#39;');}
 
 async function saveEdit(id){
   var b=allBookings.find(function(x){return x.id===id;});
@@ -1300,13 +1300,15 @@ function adminRow(b,isPending){
 
 async function deleteBooking(id,name){
   if(!confirm('Permanently delete booking for "'+name+'"? This cannot be undone.'))return;
-  // Delete attached files from storage
-  var b=allBookings.find(function(x){return x.id===id;});
-  if(b&&b.files&&b.files.length){
-    try{await sb.storage.from('booking-files').remove(b.files);}catch(e){}
-  }
-  await sb.from('bookings').delete().eq('id',id);
-  await loadBookings();
+  try{
+    var b=allBookings.find(function(x){return x.id===id;});
+    if(b&&b.files&&b.files.length){
+      try{await sb.storage.from('booking-files').remove(b.files);}catch(e){}
+    }
+    var{error}=await sb.from('bookings').delete().eq('id',id);
+    if(error){alert('Delete failed: '+error.message);return;}
+    await loadBookings();
+  }catch(e){alert('Delete error: '+e.message);}
 }
 
 async function saveCoordNotes(id){
